@@ -123,8 +123,8 @@ class FishDataset(Dataset):
 
         data_index = idx - (self.dataset_cumsum_lengths[self.current_dataset_id] - self.dataset_cumsum_lengths[prev_id])
         
-        image, segment = dataset[data_index]
-        return image / 255.0, segment / 255.0  
+        image, segment, filename = dataset[data_index]
+        return image / 255.0, segment / 255.0, filename
 
 class FishSubsetDataset(Dataset):
     
@@ -153,8 +153,8 @@ class FishSubsetDataset(Dataset):
 
         data_index = idx - (self.dataset_cumsum_lengths[self.current_dataset_id] - self.dataset_cumsum_lengths[prev_id])
         
-        image, segment = dataset[data_index]
-        return image / 255.0, segment / 255.0  
+        image, segment, filename = dataset[data_index]
+        return image / 255.0, segment / 255.0, filename
 
 if __name__ == "__main__":
    

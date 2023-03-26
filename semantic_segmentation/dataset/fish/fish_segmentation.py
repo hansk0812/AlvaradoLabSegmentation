@@ -40,7 +40,7 @@ class SegmentationDataset(Dataset):
         
         image_path, segments_paths = self.segmentation_data[data_key]["image"], self.segmentation_data[data_key]["segments"]
         image = imread(image_path)
-        image = cv2.resize(image, (img_shape, img_shape))
+        image = cv2.resize(image, (self.img_shape, self.img_shape))
         
         num_segments = len(composite_labels) if self.organs is None else len(self.organs)
         segment_array = np.zeros((self.img_shape, self.img_shape, num_segments)) 
@@ -65,7 +65,7 @@ class SegmentationDataset(Dataset):
             except Exception:
                 segment_array[:, :, organ_index].fill(-1) 
         
-        return image.transpose((2,0,1)), segment_array.transpose((2,0,1))
+        return image.transpose((2,0,1)), segment_array.transpose((2,0,1)), segments_paths[organ]
 
 def get_ml_training_set_data(dtype, path, folder_path, img_shape, min_segment_positivity_ratio, sample_dataset=True, organs=None):
     
