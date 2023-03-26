@@ -106,7 +106,7 @@ class CocoSegmentationDataset(Dataset):
 
             segment_array[:, :, organ_index] = seg 
              
-        return image.transpose((2,0,1)), segment_array.transpose((2,0,1)), image_path
+        return image.transpose((2,0,1)).astype(np.float32), segment_array.transpose((2,0,1)).astype(np.float32), image_path
 
 def get_alvaradolab_data(dtype, path, folder_path, img_shape, min_segment_positivity_ratio, sample_dataset=True, organs=None):
     

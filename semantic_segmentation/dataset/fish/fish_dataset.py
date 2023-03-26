@@ -42,8 +42,6 @@ class FishDataset(Dataset):
         self.min_segment_positivity_ratio = min_segment_positivity_ratio
         self.xy_pairs = []
 
-        self.img_shape = img_shape
-        
         # Accepts single type of data only
         datasets = reversed(list(reversed([x for x in datasets if x["type"] == dataset_type])))
         

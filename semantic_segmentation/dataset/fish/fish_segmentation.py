@@ -1,5 +1,6 @@
 import os
 import glob
+import traceback
 
 import rawpy
 import cv2
@@ -29,7 +30,12 @@ class SegmentationDataset(Dataset):
         self.segmentation_keys = list(segmentation_data.keys())
         self.img_shape = img_shape 
         self.min_segment_positivity_ratio = min_segment_positivity_ratio
-        self.organs = organs 
+        self.organs = organs
+        
+        if not organs is None:
+            self.label_indices = sorted([composite_labels.index(organ) for organ in organs])
+        else:
+            self.label_indices = list(range(len(composite_labels)))
 
     def __len__(self):
         return len(self.segmentation_keys)
@@ -45,9 +51,10 @@ class SegmentationDataset(Dataset):
         num_segments = len(composite_labels) if self.organs is None else len(self.organs)
         segment_array = np.zeros((self.img_shape, self.img_shape, num_segments)) 
         
-        for organ_index, organ in enumerate(composite_labels):
+        for organ_index in self.label_indices:
             
             try:
+                organ = composite_labels[organ_index]
                 segment = imread(segments_paths[organ])
             
                 segment = cv2.resize(segment, (self.img_shape, self.img_shape))
@@ -63,9 +70,10 @@ class SegmentationDataset(Dataset):
                 segment_array[:, :, organ_index] = segment 
             
             except Exception:
+                traceback.print_exc()
                 segment_array[:, :, organ_index].fill(-1) 
         
-        return image.transpose((2,0,1)), segment_array.transpose((2,0,1)), segments_paths[organ]
+        return image.transpose((2,0,1)).astype(np.float32), segment_array.transpose((2,0,1)).astype(np.float32), segments_paths[organ]
 
 def get_ml_training_set_data(dtype, path, folder_path, img_shape, min_segment_positivity_ratio, sample_dataset=True, organs=None):
     

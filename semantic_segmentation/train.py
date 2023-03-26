@@ -54,7 +54,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
         with torch.no_grad():
             val_running_loss, ce_t, fl_t, dice_t = 0.0, 0.0, 0.0, 0.0
             for j, val_data in enumerate(valdataloader, 0):
-                val_inputs, val_labels = val_data
+                val_inputs, val_labels, _ = val_data
                 val_inputs, val_labels = val_inputs.cuda(), val_labels.cuda()
 
                 val_outputs = net(val_inputs)
@@ -103,7 +103,7 @@ if __name__ == "__main__":
    
    # Training script
 
-    train_dataloader = DataLoader(fish_train_dataset, shuffle=True, batch_size=28, num_workers=4)
+    train_dataloader = DataLoader(fish_train_dataset, shuffle=True, batch_size=4, num_workers=4)
     val_dataloader = DataLoader(fish_val_dataset, shuffle=True, batch_size=1, num_workers=0)
 
     #optimizer = optim.SGD(vgg_unet.parameters(), lr=0.001, momentum=0.9)

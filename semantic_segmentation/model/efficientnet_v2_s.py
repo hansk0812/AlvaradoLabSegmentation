@@ -8,8 +8,8 @@ from torchvision.models import __file__, __dict__, efficientnet_v2_s, EfficientN
 weights = EfficientNet_V2_S_Weights.IMAGENET1K_V1
 model = efficientnet_v2_s(weights)
 
-torch.save(model, "efficientnet.pth")
-print (summary(model, (3,256,256))); exit()
+#torch.save(model, "efficientnet.pth")
+#print (summary(model, (3,256,256))); exit()
 
 class UNet(nn.Module):
     
@@ -45,7 +45,8 @@ class EfficientNetDeconv(nn.Module):
         return x
 
 net = UNet(model)
+#net = net.cuda()
 print (net.forward(torch.ones((1,3,256,256))).shape)
 
 with open('efficientnet.txt', 'w') as sys.stdout:
-    summary(model, (3, 256, 256))
+    summary(net, (3, 256, 256))
