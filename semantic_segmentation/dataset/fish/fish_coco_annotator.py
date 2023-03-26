@@ -20,6 +20,8 @@ class CocoSegmentationDataset(Dataset):
     
     def __init__(self, coco_images, coco_txt, img_shape, min_segment_positivity_ratio=0.05, organs=None, sample_dataset=True, ann_format="xyxy"):
         
+        #TODO ann_format
+
         global composite_labels
         
         assert ann_format in ["xywh", "xyxy"] and len(coco_images) == len(coco_txt)
@@ -104,7 +106,7 @@ class CocoSegmentationDataset(Dataset):
 
             segment_array[:, :, organ_index] = seg 
              
-        return image.transpose((2,0,1)), segment_array.transpose((2,0,1))
+        return image.transpose((2,0,1)), segment_array.transpose((2,0,1)), image_path
 
 def get_alvaradolab_data(dtype, path, folder_path, img_shape, min_segment_positivity_ratio, sample_dataset=True, organs=None):
     
