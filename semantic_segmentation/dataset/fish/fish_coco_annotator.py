@@ -122,7 +122,7 @@ def get_alvaradolab_data(dtype, path, folder_path, img_shape, min_segment_positi
     for idx in reversed(removable_indices):
         del images[idx]
         del labels[idx]
-
+    
     dataset = CocoSegmentationDataset(images, labels, img_shape, min_segment_positivity_ratio, sample_dataset=sample_dataset, organs=organs)
     print ("Using %d labeled images from dataset: %s!" % (len(dataset), "COCO Segmentation: %s" % path))
     

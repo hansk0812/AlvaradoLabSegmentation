@@ -24,7 +24,7 @@ import traceback
 
 class FishDataset(Dataset):
 
-    def __init__(self, dataset_type="segmentation", config_file = "resources/config.json", 
+    def __init__(self, dataset_type="segmentation", config_file = "fish_metadata.json", 
                     img_shape = 256, min_segment_positivity_ratio=0.0075, organs=["whole_body"],
                     sample_dataset=True): 
         # min_segment_positivity_ratio is around 0.009 - 0.011 for eye (the smallest part)
@@ -68,7 +68,7 @@ class FishDataset(Dataset):
                 # create train, val or test sets
                 num_samples = {"train": [0, int(len(dataset) * dataset_splits["train"])]}
                 num_samples["val"] = [num_samples["train"][1], num_samples["train"][1] + int(len(dataset) * dataset_splits["val"])] 
-                num_samples["test"] = [num_samples["val"][1], num_samples["val"][1] + int(len(dataset) * dataset_splits["test"]) + 1]
+                num_samples["test"] = [num_samples["val"][1], len(dataset)]
                 
                 indices = range(*num_samples["train"])
                 self.datasets.append(torch.utils.data.Subset(dataset, indices))
@@ -154,7 +154,6 @@ class FishSubsetDataset(Dataset):
         data_index = idx - (self.dataset_cumsum_lengths[self.current_dataset_id] - self.dataset_cumsum_lengths[prev_id])
         
         image, segment = dataset[data_index]
-        print (image.min(), image.max(), segment.min(), segment.max())
         return image / 255.0, segment / 255.0  
 
 if __name__ == "__main__":
@@ -163,9 +162,10 @@ if __name__ == "__main__":
     
     ap = argparse.ArgumentParser()
     ap.add_argument("--visualize", default="alvaradolab", help="Flag to visualize composite labels")
+    ap.add_argument("--sample_dataset", action="store_true", help="Boolean to sample dataset instead of use all data")
     args = ap.parse_args()
 
-    dataset = FishDataset(dataset_type="segmentation/composite") 
+    dataset = FishDataset(dataset_type="segmentation/composite", sample_dataset=args.sample_dataset) 
     print ("train dataset: %d images" % len(dataset))
 
     val_datasets, val_cumsum_lengths, \
