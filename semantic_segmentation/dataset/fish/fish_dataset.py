@@ -109,7 +109,7 @@ class FishDataset(Dataset):
 
     def __getitem__(self, idx):         
         
-        while idx > self.dataset_cumsum_lengths[self.current_dataset_id]:
+        while idx >= self.dataset_cumsum_lengths[self.current_dataset_id]:
             self.current_dataset_id += 1
 
         dataset = self.datasets[self.current_dataset_id]
@@ -139,19 +139,21 @@ class FishSubsetDataset(Dataset):
 
     def __getitem__(self, idx):
     
-        while idx > self.dataset_cumsum_lengths[self.current_dataset_id]:
+        #TODO: Iterate from given idx using while loop - shuffle=False preferred for val and test sets
+        if idx == self.dataset_cumsum_lengths[self.current_dataset_id]:
             self.current_dataset_id += 1
-
         dataset = self.datasets[self.current_dataset_id]
-
+        
         if self.current_dataset_id == 0:
             prev_id = 0
         else:
             prev_id = self.current_dataset_id - 1
 
         data_index = idx - (self.dataset_cumsum_lengths[self.current_dataset_id] - self.dataset_cumsum_lengths[prev_id])
-        
         image, segment, filename = dataset[data_index]
+        
+        if idx + 1 == self.dataset_cumsum_lengths[-1]:
+            self.current_dataset_id = 0
         return image / 255.0, segment / 255.0, filename
 
 if __name__ == "__main__":
@@ -173,5 +175,4 @@ if __name__ == "__main__":
     print ("val dataset: %d images" % len(valdataset))
     testdataset = FishSubsetDataset(test_datasets, test_cumsum_lengths) 
     print ("test dataset: %d images" % len(testdataset))
-
 
