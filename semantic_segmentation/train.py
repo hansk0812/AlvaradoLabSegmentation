@@ -55,14 +55,14 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                 running_loss, ce_t, fl_t, dice_t, bce_t = 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0], 0.0
         
         with torch.no_grad():
-            val_running_loss, ce_t, fl_t, dice_t = 0.0, 0.0, 0.0, [0.0, 0.0, 0.0]
+            val_running_loss, ce_t, fl_t, dice_t, bce_t = 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0], 0.0
             for j, val_data in enumerate(valdataloader, 0):
                 val_inputs, val_labels, _ = val_data
                 val_inputs, val_labels = val_inputs.cuda(), val_labels.cuda()
 
                 val_outputs = net(val_inputs)
-                ce_l, fl_l, dice, twersky_dice, focal_dice = losses_fn(val_outputs, val_labels)
-                dice_l = [dice, twersky_dice, focal_dice]
+                ce_l, bce_l, fl_l, dice, generalized_dice, twersky_dice, focal_dice = losses_fn(val_outputs, val_labels)
+                dice_l = [dice, twersky_dice, focal_dice, generalized_dice]
                 val_loss = ce_l + fl_l + sum(dice_l)
                 val_running_loss += val_loss.item()
                 ce_t += ce_l.item()
@@ -111,11 +111,11 @@ if __name__ == "__main__":
    
    # Training script
 
-    train_dataloader = DataLoader(fish_train_dataset, shuffle=True, batch_size=6, num_workers=3)
+    train_dataloader = DataLoader(fish_train_dataset, shuffle=True, batch_size=7, num_workers=3)
     val_dataloader = DataLoader(fish_val_dataset, shuffle=False, batch_size=1, num_workers=1)
     
-    optimizer = optim.SGD(vgg_unet.parameters(), lr=0.001, momentum=0.9)
-    #optimizer = optim.Adam(vgg_unet.parameters(), lr=0.001)
+    #optimizer = optim.SGD(vgg_unet.parameters(), lr=0.001, momentum=0.9)
+    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.01)
 
     model_dir = "vgg/"
     save_dir = "models/"+model_dir
