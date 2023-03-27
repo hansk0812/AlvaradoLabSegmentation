@@ -127,8 +127,6 @@ class FishSubsetDataset(Dataset):
         self.min_segment_positivity_ratio = min_segment_positivity_ratio
         self.datasets = datasets
         self.dataset_cumsum_lengths = cumsum_lengths
-        
-        self.current_dataset_id = 0
 
     def __len__(self):
         return self.dataset_cumsum_lengths[-1]
@@ -136,20 +134,18 @@ class FishSubsetDataset(Dataset):
     def __getitem__(self, idx):
     
         #TODO: Iterate from given idx using while loop - shuffle=False preferred for val and test sets
-        if idx == self.dataset_cumsum_lengths[self.current_dataset_id]:
-            self.current_dataset_id += 1
-        dataset = self.datasets[self.current_dataset_id]
+        current_dataset_id = 0
+        while idx >= self.dataset_cumsum_lengths[current_dataset_id]:
+            current_dataset_id += 1
+        dataset = self.datasets[current_dataset_id]
         
-        if self.current_dataset_id == 0:
-            prev_id = 0
+        if current_dataset_id == 0:
+            data_index = idx
         else:
-            prev_id = self.current_dataset_id - 1
-
-        data_index = idx - (self.dataset_cumsum_lengths[self.current_dataset_id] - self.dataset_cumsum_lengths[prev_id])
+            data_index = idx - self.dataset_cumsum_lengths[current_dataset_id-1]
+        
         image, segment, filename = dataset[data_index]
         
-        if idx + 1 == self.dataset_cumsum_lengths[-1]:
-            self.current_dataset_id = 0
         return image / 255.0, segment / 255.0, filename
 
 if __name__ == "__main__":
