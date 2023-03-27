@@ -5,7 +5,7 @@ class SegmentationLoss:
     def __init__(self, eta=1e-7):
         self.eta = eta
 
-    def weighted_cross_entropy(self, ground_truth, predicted_segment):
+    def cross_entropy(self, ground_truth, predicted_segment):
         # w = (N-p)/N
         # l = -(1/N) \sum_i=1^N w*gt*\log(p) + (1-gt)*\log(1-p)
 

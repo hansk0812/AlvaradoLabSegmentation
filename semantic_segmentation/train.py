@@ -5,11 +5,13 @@ import traceback
 from .dataset.fish import fish_train_dataset, fish_val_dataset, fish_test_dataset
 from .model import vgg_unet
 from .loss_f import cross_entropy_loss, focal_loss, classification_dice_loss
+from .loss import SegmentationLoss
 
 #import get_deepfish_dataset
 
 import torch
 from torch import nn 
+from torch.nn import functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
@@ -18,7 +20,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.75, patience=3) 
     for epoch in range(start_epoch+1, num_epochs):  # loop over the dataset multiple times
 
-        running_loss, ce_t, fl_t, dice_t = 0.0, 0.0, 0.0, [0.0, 0.0, 0.0]
+        running_loss, ce_t, fl_t, dice_t, bce_t = 0.0, 0.0, 0.0, [0.0, 0.0, 0.0], 0
         for i, data in enumerate(traindataloader, 0):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels, _ = data
@@ -28,10 +30,13 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             optimizer.zero_grad()
 
             # forward + backward + optimize
-            outputs = net(inputs)
+            outputs = F.softmax(net(inputs), dim=-1)
             ce_l, fl_l, dice, twersky_dice, focal_dice = losses_fn(outputs, labels)
             dice_l = [dice, twersky_dice, focal_dice]
-            loss = ce_l + fl_l + sum(dice_l)
+            bce_l = SEGLOSSCLASS.cross_entropy(outputs, labels)
+            dl = SEGLOSSCLASS.dice_score_loss(outputs, labels)
+            print (dice_l, dl)
+            loss = ce_l + fl_l + sum(dice_l) + bce_l
             loss.backward()
             optimizer.step()
 
@@ -39,6 +44,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             running_loss += loss.item()
             ce_t+= ce_l.item()
             fl_t+= fl_l.item()
+            bce_t+= bce_l.item()
             
             dice_t = [x.item() + y for (x,y) in zip(dice_l, dice_t)]
             if i % log_every == log_every-1:    # print every log_every mini-batches
@@ -46,8 +52,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                 torch.save(net.state_dict(), "%s/%s_epoch%d.pt" % (save_dir, "densenet", epoch))
 
                 print("Epoch: %d ; Batch: %d/%d : Training Loss: %.8f" % (epoch+1, i+1, len(traindataloader), running_loss / log_every))
-                print ("\t Cross-Entropy: %0.8f; Focal Loss: %0.8f; Dice Loss: %0.8f [D: %.8f, TwD: %.8f, FocD: %.8f]" % (
-                            ce_t/float(log_every), fl_t/float(log_every), sum([x/float(log_every) for x in dice_t]), 
+                print ("\t Cross-Entropy: %0.8f; BCE: %0.8f; Focal Loss: %0.8f; Dice Loss: %0.8f [D: %.8f, TwD: %.8f, FocD: %.8f]" % (
+                            ce_t/float(log_every), bce_t/float(log_every), fl_t/float(log_every), sum([x/float(log_every) for x in dice_t]), 
                             dice_t[0]/float(log_every), dice_t[1]/float(log_every), dice_t[2]/float(log_every)))
                 
                 running_loss, ce_t, fl_t, dice_t = 0.0, 0.0, 0.0, [0.0, 0.0, 0.0]
@@ -121,6 +127,6 @@ if __name__ == "__main__":
     start_epoch = load_recent_model(save_dir, vgg_unet)
 
     vgg_unet = vgg_unet.cuda()
-
+    SEGLOSSCLASS = SegmentationLoss()
     train(vgg_unet, train_dataloader, val_dataloader, losses_fn, optimizer, save_dir=save_dir, start_epoch=start_epoch, log_every=1)
 
