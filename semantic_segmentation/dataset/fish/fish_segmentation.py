@@ -25,6 +25,24 @@ class SegmentationDataset(Dataset):
         
         if sample_dataset:
             segmentation_data = {key: segmentation_data[key] for key in list(segmentation_data)[:60]}
+        
+        # Ensure all files contribute to data wrt organs
+        if organs is None:
+            test_organs = composite_labels
+        else:
+            test_organs = organs 
+        for key in segmentation_data:
+            
+            ctx = 0
+            for organ in test_organs:
+                try:
+                    imread(segmentation_data[key]["segments"][organ])
+                    ctx += 1
+                except Exception:
+                    continue
+            
+            if ctx == 0:
+                del segmentation_data[key]
 
         self.segmentation_data = segmentation_data
         self.segmentation_keys = list(segmentation_data.keys())
@@ -118,8 +136,16 @@ def get_ml_training_set_data(dtype, path, folder_path, img_shape, min_segment_po
                         segment_paths[organ] = ann_paths[0]  
             
             if len(segment_paths) > 0:
-                data[data_index] = {"image": image_path, \
-                                    "segments": segment_paths}
+
+                try:
+                    img = cv2.imread(image_path)
+                    assert not img is None
+
+                    data[data_index] = {"image": image_path, \
+                                        "segments": segment_paths}
+
+                except Exception:
+                    pass
 
     dataset = SegmentationDataset(data, img_shape, min_segment_positivity_ratio, sample_dataset=sample_dataset, organs=organs)
     print ("Using %d labeled images from dataset: %s!" % (len(dataset), "Segmentation dataset: %s" % path))
