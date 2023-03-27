@@ -30,7 +30,9 @@ class SegmentationDataset(Dataset):
         if organs is None:
             test_organs = composite_labels
         else:
-            test_organs = organs 
+            test_organs = organs
+
+        removable_keys = []
         for key in segmentation_data:
             
             ctx = 0
@@ -42,7 +44,10 @@ class SegmentationDataset(Dataset):
                     continue
             
             if ctx == 0:
-                del segmentation_data[key]
+                removable_keys.append(key)
+        
+        for key in removable_keys:
+            del segmentation_data[key]
 
         self.segmentation_data = segmentation_data
         self.segmentation_keys = list(segmentation_data.keys())
