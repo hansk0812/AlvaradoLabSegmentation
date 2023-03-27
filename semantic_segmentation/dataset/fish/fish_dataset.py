@@ -20,7 +20,7 @@ from .fish_segmentation import get_ml_training_set_data
 
 import traceback
 
-#TODO ChainDataset
+#TODO ChainDataset: In-memory dataset seemed faster
 
 class FishDataset(Dataset):
 
@@ -85,8 +85,6 @@ class FishDataset(Dataset):
                 traceback.print_exc()
                 print ("Write generator function for dataset: %s ;" % dataset_method, e)
         
-        self.current_dataset_id = 0
-
     def return_val_test_datasets(self):
         
         val_cumsum_lengths, test_cumsum_lengths = [], []
@@ -107,19 +105,17 @@ class FishDataset(Dataset):
     def __len__(self):
         return self.dataset_cumsum_lengths[-1]
 
-    def __getitem__(self, idx):         
+    def __getitem__(self, idx):
         
-        while idx >= self.dataset_cumsum_lengths[self.current_dataset_id]:
-            self.current_dataset_id += 1
-
-        dataset = self.datasets[self.current_dataset_id]
-        
-        if self.current_dataset_id == 0:
-            prev_id = 0
+        current_dataset_id = 0
+        while idx >= self.dataset_cumsum_lengths[current_dataset_id]:
+            current_dataset_id += 1
+        if current_dataset_id > 0:
+            data_index = idx - self.dataset_cumsum_lengths[current_dataset_id-1]       
         else:
-            prev_id = self.current_dataset_id - 1
+            data_index = idx
 
-        data_index = idx - (self.dataset_cumsum_lengths[self.current_dataset_id] - self.dataset_cumsum_lengths[prev_id])
+        dataset = self.datasets[current_dataset_id]
         
         image, segment, filename = dataset[data_index]
         return image / 255.0, segment / 255.0, filename

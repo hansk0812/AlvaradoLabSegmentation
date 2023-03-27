@@ -107,7 +107,7 @@ if __name__ == "__main__":
    
    # Training script
 
-    train_dataloader = DataLoader(fish_train_dataset, shuffle=True, batch_size=7, num_workers=4)
+    train_dataloader = DataLoader(fish_train_dataset, shuffle=True, batch_size=6, num_workers=3)
     val_dataloader = DataLoader(fish_val_dataset, shuffle=False, batch_size=1, num_workers=1)
     
     optimizer = optim.SGD(vgg_unet.parameters(), lr=0.001, momentum=0.9)
