@@ -7,8 +7,8 @@ from torch import nn
 logsoftmax = lambda x: F.log_softmax(x, dim=2)
 
 def cross_entropy_loss(gt, pred, weight=0.55):
-    ce = F.binary_cross_entropy(pred, gt) 
-    #F.cross_entropy(pred[:,0,:], torch.argmax(gt[:,0,:], dim=1)) #, weight=torch.tensor([1-weight, weight]).cuda())
+    ce = F.cross_entropy(pred[:,0,:], torch.argmax(gt[:,0,:], dim=1)) 
+    #F.binary_cross_entropy(pred, gt) #, weight=torch.tensor([1-weight, weight]).cuda())
     #ce = - (1-weight) * (gt*logsoftmax(pred)) - weight * (1-gt)*logsoftmax(1-pred)
     return torch.sum(ce)
 
@@ -41,9 +41,9 @@ def focal_dice_coefficient(gt, pred, alpha=0.5, beta=0.3, gamma=1.8):
 
 
 def classification_dice_loss(gt, pred, factor=1e3):
-
-    return factor * 0.33 * (
-                   dice_loss(gt, pred) + \
-                   twersky_loss(gt, pred) + \
-                   focal_dice_coefficient(gt, pred))
-
+    
+    dice_l = dice_loss(gt, pred)
+    twersky_l = twersky_loss(gt, pred)
+    focal_dice_l = focal_dice_coefficient(gt, pred) 
+    m = factor * 0.33 
+    return  dice_l*m, twersky_l*m, focal_dice_l*m

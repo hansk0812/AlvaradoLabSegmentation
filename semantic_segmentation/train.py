@@ -17,9 +17,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
     
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.75, patience=3) 
     for epoch in range(start_epoch+1, num_epochs):  # loop over the dataset multiple times
-        
 
-        running_loss, ce_t, fl_t, dice_t = 0.0, 0.0, 0.0, 0.0
+        running_loss, ce_t, fl_t, dice_t = 0.0, 0.0, 0.0, [0.0, 0.0, 0.0]
         for i, data in enumerate(traindataloader, 0):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels, _ = data
@@ -30,40 +29,43 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
 
             # forward + backward + optimize
             outputs = net(inputs)
-            ce_l, fl_l, dice_l = losses_fn(outputs, labels)
-            loss = 0 * ce_l + fl_l + dice_l
+            ce_l, fl_l, dice, twersky_dice, focal_dice = losses_fn(outputs, labels)
+            dice_l = [dice, twersky_dice, focal_dice]
+            loss = ce_l + fl_l + sum(dice_l)
             loss.backward()
             optimizer.step()
 
-            
             # print statistics
             running_loss += loss.item()
             ce_t+= ce_l.item()
             fl_t+= fl_l.item()
-            dice_t+= dice_l.item()
+            
+            dice_t = [x.item() + y for (x,y) in zip(dice_l, dice_t)]
             if i % log_every == log_every-1:    # print every log_every mini-batches
 
                 torch.save(net.state_dict(), "%s/%s_epoch%d.pt" % (save_dir, "densenet", epoch))
 
-                print(f'[{epoch + 1}, {i + 1:5d}] Training Loss: {running_loss / log_every:.8f}!')
-                print ("\t Cross-Entropy: %0.8f; Focal Loss: %0.8f; Dice Loss: %0.8f" % (
-                            ce_t/float(log_every), fl_t/float(log_every), dice_t/float(log_every)))
-
-                running_loss, ce_t, fl_t, dice_t = 0.0, 0.0, 0.0, 0.0
+                print("Epoch: %d ; Batch: %d/%d : Training Loss: %.8f" % (epoch+1, i+1, len(traindataloader), running_loss / log_every))
+                print ("\t Cross-Entropy: %0.8f; Focal Loss: %0.8f; Dice Loss: %0.8f [D: %.8f, TwD: %.8f, FocD: %.8f]" % (
+                            ce_t/float(log_every), fl_t/float(log_every), sum([x/float(log_every) for x in dice_t]), 
+                            dice_t[0]/float(log_every), dice_t[1]/float(log_every), dice_t[2]/float(log_every)))
+                
+                running_loss, ce_t, fl_t, dice_t = 0.0, 0.0, 0.0, [0.0, 0.0, 0.0]
         
         with torch.no_grad():
-            val_running_loss, ce_t, fl_t, dice_t = 0.0, 0.0, 0.0, 0.0
+            val_running_loss, ce_t, fl_t, dice_t = 0.0, 0.0, 0.0, [0.0, 0.0, 0.0]
             for j, val_data in enumerate(valdataloader, 0):
                 val_inputs, val_labels, _ = val_data
                 val_inputs, val_labels = val_inputs.cuda(), val_labels.cuda()
 
                 val_outputs = net(val_inputs)
-                ce_l, fl_l, dice_l = losses_fn(val_outputs, val_labels)
-                val_loss = ce_l + fl_l + dice_l
+                ce_l, fl_l, dice, twersky_dice, focal_dice = losses_fn(val_outputs, val_labels)
+                dice_l = [dice, twersky_dice, focal_dice]
+                val_loss = ce_l + fl_l + sum(dice_l)
                 val_running_loss += val_loss.item()
                 ce_t += ce_l.item()
                 fl_t += fl_l.item()
-                dice_t += dice_l.item()
+                dice_t = [x.item() + y for (x,y) in zip(dice_l, dice_t)]
             
             num_avg = float(len(valdataloader)*val_inputs.shape[0])
             val_running_loss /= float(num_avg)
@@ -71,15 +73,17 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             if epoch % 2 == 0:
                 scheduler.step(val_running_loss)
 
-        print(f'\n[{epoch + 1}, {i + 1:5d}] Val Loss: %.8f!' % val_running_loss)
-        print ("\t Cross-Entropy: %0.8f; Focal Loss: %0.8f; Dice Loss: %0.8f" % (
-                    ce_t/float(num_avg), fl_t/float(num_avg), dice_t/float(num_avg)))
+        print("\nVal Loss: %.8f!" % val_running_loss)
+        print ("\t Cross-Entropy: %0.8f; Focal Loss: %0.8f; Dice Loss: %0.8f [D: %.8f, TwD: %.8f, FocD: %.8f]" % (
+                    ce_t/float(num_avg), fl_t/float(num_avg), sum([x/float(num_avg) for x in dice_t]), 
+                    dice_t[0]/float(num_avg), dice_t[1]/float(num_avg), dice_t[2]/float(num_avg)))
 
-    print('Finished Training')
+    print('finished training')
 
 def losses_fn(x, g): 
-    ce_loss, fl_loss, dice_loss = cross_entropy_loss(x, g), focal_loss(x, g, factor=0.1), classification_dice_loss(x, g, factor=10)
-    return ce_loss, fl_loss, dice_loss
+    ce_loss, fl_loss = cross_entropy_loss(x, g), focal_loss(x, g, factor=1e-5)
+    dice, twersky_dice, focal_dice = classification_dice_loss(x, g, factor=10)
+    return ce_loss, fl_loss, dice, twersky_dice, focal_dice
 
 def load_recent_model(saved_dir, net):
     
@@ -103,11 +107,11 @@ if __name__ == "__main__":
    
    # Training script
 
-    train_dataloader = DataLoader(fish_train_dataset, shuffle=True, batch_size=4, num_workers=4)
-    val_dataloader = DataLoader(fish_val_dataset, shuffle=True, batch_size=1, num_workers=0)
-
-    #optimizer = optim.SGD(vgg_unet.parameters(), lr=0.001, momentum=0.9)
-    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.001)
+    train_dataloader = DataLoader(fish_train_dataset, shuffle=True, batch_size=7, num_workers=4)
+    val_dataloader = DataLoader(fish_val_dataset, shuffle=False, batch_size=1, num_workers=1)
+    
+    optimizer = optim.SGD(vgg_unet.parameters(), lr=0.001, momentum=0.9)
+    #optimizer = optim.Adam(vgg_unet.parameters(), lr=0.001)
 
     model_dir = "vgg/"
     save_dir = "models/"+model_dir
@@ -118,5 +122,5 @@ if __name__ == "__main__":
 
     vgg_unet = vgg_unet.cuda()
 
-    train(vgg_unet, train_dataloader, val_dataloader, losses_fn, optimizer, save_dir=save_dir, start_epoch=start_epoch)
+    train(vgg_unet, train_dataloader, val_dataloader, losses_fn, optimizer, save_dir=save_dir, start_epoch=start_epoch, log_every=1)
 
