@@ -85,10 +85,14 @@ class SegmentationDataset(Dataset):
                 segment[segment > 245] = 0
                 segment[segment != 0] = 255
                 
+                print (segment.min(), segment.max())
+                cv2.imwrite("f.png", segment); exit()
+                
                 area_of_segment = segment.sum() / 255.0
                 
                 if area_of_segment * 255 < (self.min_segment_positivity_ratio * self.img_shape * self.img_shape):
-                    segment.fill(-1)
+                    #TODO: Ignore labels
+                    segment.fill(0) # (-1)
                 
                 segment_array[:, :, organ_index] = segment 
             
@@ -156,3 +160,4 @@ def get_ml_training_set_data(dtype, path, folder_path, img_shape, min_segment_po
     print ("Using %d labeled images from dataset: %s!" % (len(dataset), "Segmentation dataset: %s" % path))
     
     return dataset
+

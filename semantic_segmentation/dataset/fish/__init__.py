@@ -6,8 +6,10 @@ composite_labels = []
 
 from .fish_dataset import FishDataset, FishSubsetDataset
 
-fish_train_dataset = FishDataset(dataset_type="segmentation/composite", sample_dataset=False)
+fish_train_dataset = FishDataset(dataset_type="segmentation/composite", sample_dataset=True)
 print ("train dataset: %d images" % len(fish_train_dataset))
+
+print (composite_labels)
 
 fish_val_datasets, val_cumsum_lengths, \
 fish_test_datasets, test_cumsum_lengths = fish_train_dataset.return_val_test_datasets()

@@ -57,6 +57,9 @@ class CocoSegmentationDataset(Dataset):
                 organ = obj[idx]
                 organ.replace(" ", "_")
                 
+                if not self.organs is None and not organ in self.organs:
+                    continue
+
                 if not organ in composite_labels:
                     if not organs is None:
                         if not organ in organs:
@@ -72,6 +75,9 @@ class CocoSegmentationDataset(Dataset):
                                 for i in range(0, len(poly_indices)-1, 2)]
                 size_ratios = np.array([img_shape / img_original_shape[1], img_shape / img_original_shape[0]]) 
                 image_polys.append({organ: np.array(polygon * size_ratios).astype(np.int32)})
+            
+            if len(image_polys)==0:
+                deletion_indices.append(index)
             self.polygons.append(image_polys)
 
         for del_idx in reversed(deletion_indices):
@@ -94,12 +100,17 @@ class CocoSegmentationDataset(Dataset):
         segment_array = np.zeros((self.img_shape, self.img_shape, num_segments)) 
         
         for poly in polygons:
+            print (poly)
             organ, polygon = list(poly.keys())[0], list(poly.values())[0]
             
             organ_index = composite_labels.index(organ)
+            print (segment_array.shape, organ_index, composite_labels)
             seg = segment_array[:, :, organ_index].astype(np.uint8) 
 
             cv2.fillPoly(seg, [polygon], 255) 
+
+            print (seg.min(), seg.max())
+            cv2.imwrite('g.png', seg); exit()
 
             if seg.sum() < (self.min_segment_positivity_ratio * self.img_shape * self.img_shape):
                 seg.fill(-1)
@@ -120,7 +131,7 @@ def get_alvaradolab_data(dtype, path, folder_path, img_shape, min_segment_positi
     for idx, (img, label) in enumerate(zip(images, labels)):
         if not (os.path.exists(img) and os.path.exists(label)):
             removable_indices.append(idx)
-    
+
     for idx in reversed(removable_indices):
         del images[idx]
         del labels[idx]
@@ -140,3 +151,4 @@ def get_alvaradolab_data(dtype, path, folder_path, img_shape, min_segment_positi
     #tracemalloc.stop()
 
     return dataset
+
