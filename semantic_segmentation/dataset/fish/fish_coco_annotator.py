@@ -100,16 +100,13 @@ class CocoSegmentationDataset(Dataset):
         segment_array = np.zeros((self.img_shape, self.img_shape, num_segments)) 
         
         for poly in polygons:
-            print (poly)
             organ, polygon = list(poly.keys())[0], list(poly.values())[0]
             
             organ_index = composite_labels.index(organ)
-            print (segment_array.shape, organ_index, composite_labels)
             seg = segment_array[:, :, organ_index].astype(np.uint8) 
 
             cv2.fillPoly(seg, [polygon], 255) 
-
-            print (seg.min(), seg.max())
+            
             cv2.imwrite('g.png', seg); exit()
 
             if seg.sum() < (self.min_segment_positivity_ratio * self.img_shape * self.img_shape):
