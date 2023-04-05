@@ -36,4 +36,6 @@ IMG_TYPES.extend([x.upper() for x in IMG_TYPES])
 #IMG_FTRANSFORMS = ['adjust_gamma']
 """
 
+from .augment import augment_fn
+
 __all__ = ["colors", "CPARTS"] 

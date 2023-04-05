@@ -6,10 +6,10 @@ composite_labels = []
 
 from .fish_dataset import FishDataset, FishSubsetDataset
 
+from .. import augment_fn
+
 fish_train_dataset = FishDataset(dataset_type="segmentation/composite", sample_dataset=True)
 print ("train dataset: %d images" % len(fish_train_dataset))
-
-print (composite_labels)
 
 fish_val_datasets, val_cumsum_lengths, \
 fish_test_datasets, test_cumsum_lengths = fish_train_dataset.return_val_test_datasets()
@@ -27,4 +27,4 @@ dataset_subsets = ["fish_train_dataset", "fish_val_dataset", "fish_test_dataset"
 #    display_composite_annotations(image, segment, composite_labels, fish_test_dataset.min_segment_positivity_ratio)
 #exit()
 
-__all__ = [*dataset_subsets, "composite_labels", "test_set_ratio", "visualize_composite_labels", "colors", "CPARTS", "DATASET_TYPES"]
+__all__ = [*dataset_subsets, "composite_labels", "test_set_ratio", "visualize_composite_labels", "colors", "CPARTS", "DATASET_TYPES", "augment_fn"]
