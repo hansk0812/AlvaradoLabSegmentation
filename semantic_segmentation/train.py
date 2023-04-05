@@ -23,7 +23,11 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
         for i, data in enumerate(traindataloader, 0):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels, _ = data
-            inputs, labels = inputs.cuda(), labels.cuda()
+
+            try:
+                inputs, labels = inputs.cuda(), labels.cuda()
+            except Exception:
+                pass
 
             # zero the parameter gradients
             optimizer.zero_grad()
@@ -111,7 +115,7 @@ if __name__ == "__main__":
    
    # Training script
 
-    train_dataloader = DataLoader(fish_train_dataset, shuffle=True, batch_size=7, num_workers=3)
+    train_dataloader = DataLoader(fish_train_dataset, shuffle=True, batch_size=1, num_workers=0)
     val_dataloader = DataLoader(fish_val_dataset, shuffle=False, batch_size=1, num_workers=1)
     
     #optimizer = optim.SGD(vgg_unet.parameters(), lr=0.001, momentum=0.9)
@@ -123,7 +127,11 @@ if __name__ == "__main__":
         os.makedirs(save_dir)
 
     start_epoch = load_recent_model(save_dir, vgg_unet)
+    
+    try:
+        vgg_unet = vgg_unet.cuda()
+    except Exception:
+        pass
 
-    vgg_unet = vgg_unet.cuda()
     train(vgg_unet, train_dataloader, val_dataloader, losses_fn, optimizer, save_dir=save_dir, start_epoch=start_epoch, log_every=1)
 
