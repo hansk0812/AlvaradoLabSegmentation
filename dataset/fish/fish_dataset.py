@@ -24,7 +24,7 @@ import traceback
 
 class FishDataset(Dataset):
 
-    def __init__(self, dataset_type="segmentation", config_file = "resources/config.json", 
+    def __init__(self, dataset_type="segmentation", config_file = "fish_metadata.json", 
                     img_shape = 256, min_segment_positivity_ratio=0.0075, organs=["whole_body"],
                     sample_dataset=True): 
         # min_segment_positivity_ratio is around 0.009 - 0.011 for eye (the smallest part)
