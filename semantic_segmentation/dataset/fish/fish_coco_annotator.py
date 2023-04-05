@@ -107,7 +107,7 @@ class CocoSegmentationDataset(Dataset):
 
             cv2.fillPoly(seg, [polygon], 255) 
             
-            cv2.imwrite('g.png', seg); exit()
+            cv2.imwrite('g.png', seg)
 
             if seg.sum() < (self.min_segment_positivity_ratio * self.img_shape * self.img_shape):
                 seg.fill(-1)
