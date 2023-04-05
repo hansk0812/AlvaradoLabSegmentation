@@ -14,6 +14,8 @@ from torch.utils.data import Dataset
 
 from . import composite_labels, dataset_splits
 
+from ..augment import augment_fn
+
 #import tracemalloc
 
 class CocoSegmentationDataset(Dataset):
@@ -113,7 +115,9 @@ class CocoSegmentationDataset(Dataset):
                 seg.fill(-1)
 
             segment_array[:, :, organ_index] = seg 
-             
+        
+        image, segment_array = augment_fn(image, segment_array)
+
         return image.transpose((2,0,1)).astype(np.float32), segment_array.transpose((2,0,1)).astype(np.float32), image_path
 
 def get_alvaradolab_data(dtype, path, folder_path, img_shape, min_segment_positivity_ratio, sample_dataset=True, organs=None):

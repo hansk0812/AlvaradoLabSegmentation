@@ -10,6 +10,8 @@ from torch.utils.data import Dataset
 
 from . import composite_labels
 
+from ..augment import augment_fn
+
 def imread(file_path):
     
     if ".arw" not in file_path.lower():
@@ -100,6 +102,8 @@ class SegmentationDataset(Dataset):
                 traceback.print_exc()
                 segment_array[:, :, organ_index].fill(-1) 
         
+        image, segment_array = augment_fn(image, segment_array)
+
         return image.transpose((2,0,1)).astype(np.float32), segment_array.transpose((2,0,1)).astype(np.float32), segments_paths[organ]
 
 def get_ml_training_set_data(dtype, path, folder_path, img_shape, min_segment_positivity_ratio, sample_dataset=True, organs=None):

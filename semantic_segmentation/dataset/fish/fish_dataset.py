@@ -170,6 +170,7 @@ class FishDataset(Dataset):
         image, segment, filename = dataset[data_index]
         #image, segment = self.augment_image(image, segment)
         #image, segment = image.transpose((2,0,1)), segment.transpose((2,0,1))
+
         return image / 255.0, segment / 255.0, filename
 
 class FishSubsetDataset(Dataset):
