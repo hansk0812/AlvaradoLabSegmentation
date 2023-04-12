@@ -36,4 +36,5 @@ IMG_TYPES.extend([x.upper() for x in IMG_TYPES])
 #IMG_FTRANSFORMS = ['adjust_gamma']
 """
 
-__all__ = ["colors", "CPARTS"] 
+from .. import datasets_metadata
+__all__ = ["colors", "CPARTS", "datasets_metadata"] 
