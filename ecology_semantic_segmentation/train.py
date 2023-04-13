@@ -32,7 +32,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             outputs = net(inputs)
             ce_l, fl_l, dice, generalized_dice, twersky_dice, focal_dice = losses_fn(outputs, labels)
             dice_l = [dice, generalized_dice, twersky_dice, focal_dice]
-            loss = twersky_dice #F.binary_cross_entropy(torch.sigmoid(outputs), labels)  #ce_l + fl_l + sum(dice_l)
+            loss = F.binary_cross_entropy(outputs, labels)  #ce_l + fl_l + sum(dice_l)
             loss.backward()
             optimizer.step()
 
