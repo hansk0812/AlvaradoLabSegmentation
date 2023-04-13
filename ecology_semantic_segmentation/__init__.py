@@ -11,6 +11,7 @@ try:
         datasets_metadata = json.load(f)
 except Exception:
     datasets_metadata = None
+    print ("datasets_metadata.json file unavailable!")
     traceback.print_exc()
 
 from .dataset.fish import fish_train_dataset, fish_val_dataset, fish_test_dataset
