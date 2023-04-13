@@ -4,16 +4,16 @@ import numpy as np
 import torch
 from torch import nn
 
-logsoftmax = lambda x: F.log_softmax(x, dim=2)
+logsoftmax = lambda x: F.log_softmax(x, dim=1)
 
 def cross_entropy_loss(gt, pred, weight=0.3, bce=False):
 
     if not bce:
-        ce = F.cross_entropy(pred[:,0,:], torch.argmax(gt[:,0,:], dim=1)) 
+        ce = F.cross_entropy(pred, gt) 
     else:
-        #ce = F.binary_cross_entropy(pred, gt) #, weight=torch.tensor([1-weight, weight]).cuda())
-        ce = - (1-weight) * (gt*logsoftmax(pred)) - weight * (1-gt)*logsoftmax(1-pred)
-        ce *= 1e-5
+        ce = F.binary_cross_entropy(pred, gt) #, weight=torch.tensor([1-weight, weight]).cuda())
+        #ce = - (1-weight) * (gt*logsoftmax(pred)) - weight * (1-gt)*logsoftmax(1-pred)
+        #ce *= 1e-5
     return torch.sum(ce)
 
 def focal_loss(gt, pred, gamma=1.5, factor=0.1):

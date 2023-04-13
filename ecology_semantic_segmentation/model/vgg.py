@@ -174,7 +174,7 @@ class VGGUNet(nn.Module):
         x, encoder_tensors = self.encoder.forward(x)
         x = self.decoder.forward(x, encoder_tensors)
 
-        return x
+        return torch.softmax(x, dim=1)
 
 if __name__ == "__main__":
     
