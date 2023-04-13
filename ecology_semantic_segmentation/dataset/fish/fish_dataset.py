@@ -7,8 +7,7 @@ import json
 import cv2
 import numpy as np
 
-import torch
-
+import torch 
 from torch.utils.data import Dataset, DataLoader
 
 from . import display_composite_annotations

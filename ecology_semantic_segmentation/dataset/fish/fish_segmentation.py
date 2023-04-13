@@ -87,7 +87,6 @@ class SegmentationDataset(Dataset):
                 segment[segment > 245] = 0
                 segment[segment != 0] = 255
                 
-                print (segment.min(), segment.max())
                 cv2.imwrite("f.png", segment); 
                 
                 area_of_segment = segment.sum() / 255.0
