@@ -16,10 +16,10 @@ from torch.utils.data import DataLoader
 
 def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, start_epoch, num_epochs=1000, log_every=100):
     
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.75, patience=60, verbose=True) 
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.75, patience=30, verbose=True) 
     for epoch in range(start_epoch+1, num_epochs):  # loop over the dataset multiple times
 
-        running_loss, ce_t, fl_t, dice_t = 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0]
+        running_loss, ce_t, bce_t, fl_t, dice_t = 0.0, 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0]
         for i, data in enumerate(traindataloader, 0):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels, fname = data
@@ -30,15 +30,16 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
 
             # forward + backward + optimize
             outputs = net(inputs)
-            ce_l, fl_l, dice, generalized_dice, twersky_dice, focal_dice = losses_fn(outputs, labels)
+            ce_l, bce_l, fl_l, dice, generalized_dice, twersky_dice, focal_dice = losses_fn(outputs, labels)
             dice_l = [dice, generalized_dice, twersky_dice, focal_dice]
-            loss = F.binary_cross_entropy(outputs, labels)  #ce_l + fl_l + sum(dice_l)
+            loss = bce_l #F.binary_cross_entropy(outputs, labels)  #ce_l + fl_l + sum(dice_l)
             loss.backward()
             optimizer.step()
 
             # print statistics
             running_loss += loss.item()
             ce_t+= ce_l.item()
+            bce_t+= bce_l.item()
             fl_t+= fl_l.item()
             
             dice_t = [x.item() + y for (x,y) in zip(dice_l, dice_t)]
@@ -55,17 +56,18 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                 running_loss, ce_t, fl_t, dice_t = 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0]
         
         with torch.no_grad():
-            val_running_loss, ce_t, fl_t, dice_t = 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0]
+            val_running_loss, ce_t, bce_t, fl_t, dice_t = 0.0, 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0]
             for j, val_data in enumerate(valdataloader, 0):
                 val_inputs, val_labels, _ = val_data
                 val_inputs, val_labels = val_inputs.cuda(), val_labels.cuda()
 
                 val_outputs = net(val_inputs)
-                ce_l, fl_l, dice, generalized_dice, twersky_dice, focal_dice = losses_fn(val_outputs, val_labels)
+                ce_l, bce_l, fl_l, dice, generalized_dice, twersky_dice, focal_dice = losses_fn(val_outputs, val_labels)
                 dice_l = [dice, generalized_dice, twersky_dice, focal_dice]
-                val_loss = F.binary_cross_entropy(torch.sigmoid(val_outputs), val_labels) #ce_l + fl_l + sum(dice_l)
+                val_loss = bce_l #F.binary_cross_entropy(val_outputs, val_labels) #ce_l + fl_l + sum(dice_l)
                 val_running_loss += val_loss.item()
                 ce_t += ce_l.item()
+                bce_t += bce_l.item()
                 fl_t += fl_l.item()
                 dice_t = [x.item() + y for (x,y) in zip(dice_l, dice_t)]
             
@@ -82,9 +84,10 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
     print('finished training')
 
 def losses_fn(x, g): 
+    bce_loss = cross_entropy_loss(x, g, bce=True)
     ce_loss, fl_loss = cross_entropy_loss(x, g), focal_loss(x, g, factor=1e-5)
     dice, generalized_dice, twersky_dice, focal_dice = classification_dice_loss(x, g, factor=10)
-    return ce_loss, fl_loss, dice, generalized_dice, twersky_dice, focal_dice
+    return ce_loss, bce_loss, fl_loss, dice, generalized_dice, twersky_dice, focal_dice
 
 def load_recent_model(saved_dir, net):
     
