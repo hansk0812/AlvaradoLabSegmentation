@@ -25,8 +25,8 @@ class SegmentationDataset(Dataset):
 
     def __init__(self, segmentation_data, img_shape, min_segment_positivity_ratio, sample_dataset = True, organs=None): 
         
-        if sample_dataset:
-            segmentation_data = {key: segmentation_data[key] for key in list(segmentation_data)[:60]}
+#        if sample_dataset:
+#            segmentation_data = {key: segmentation_data[key] for key in list(segmentation_data)[:60]}
         
         # Ensure all files contribute to data wrt organs
         if organs is None:
@@ -122,6 +122,10 @@ def get_ml_training_set_data(dtype, path, folder_path, img_shape, min_segment_po
         dir_folders = glob.glob(os.path.join(directory, "*"))
         
         images = glob.glob(os.path.join(directory, 'original image/*'))
+
+        if sample_dataset:
+            images = images[:20]
+
         for image_path in images:
             fname = "/".join(image_path.split('/')[-3:])
             search_key = '.'.join(fname.split('/')[-1].split('.')[:-1])
