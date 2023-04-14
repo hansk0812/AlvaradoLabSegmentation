@@ -1,3 +1,5 @@
+import argparse
+
 import os
 import glob
 import traceback
@@ -7,6 +9,8 @@ from . import vgg_unet
 from .loss_functions import cross_entropy_loss, focal_loss, classification_dice_loss
 
 #import get_deepfish_dataset
+import numpy as np
+import cv2
 
 import torch
 from torch import nn
@@ -14,8 +18,13 @@ from torch.nn import functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
+torchcpu_to_opencv = lambda img: (img.numpy().transpose((1,2,0))*255).astype(np.uint8)
+
 def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, start_epoch, num_epochs=1000, log_every=100):
     
+    if not os.path.isdir("val_images"):
+        os.mkdir("val_images")
+
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.75, patience=30, verbose=True) 
     for epoch in range(start_epoch+1, num_epochs):  # loop over the dataset multiple times
 
@@ -32,10 +41,9 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             outputs = net(inputs)
             
             ce_l, bce_l, fl_l, dice, generalized_dice, twersky_dice, focal_dice = losses_fn(outputs, labels)
-            #bce_l = losses_fn(outputs, labels)
             dice_l = [dice, generalized_dice, twersky_dice, focal_dice]
             
-            loss = generalized_dice #bce_l #ce_l + fl_l + sum(dice_l)
+            loss = sum(dice_l) #bce_l #ce_l + fl_l + 
             loss.backward()
             optimizer.step()
 
@@ -56,7 +64,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                             ce_t/float(log_every), bce_t/float(log_every), fl_t/float(log_every), sum([x/float(log_every) for x in dice_t]), 
                             dice_t[0]/float(log_every), dice_t[1]/float(log_every), dice_t[2]/float(log_every), dice_t[3]/float(log_every)))
                 
-                running_loss, ce_t, fl_t, dice_t = 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0]
+                running_loss, ce_t, bce_t, fl_t, dice_t = 0.0, 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0]
         
         with torch.no_grad():
             val_running_loss, ce_t, bce_t, fl_t, dice_t = 0.0, 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0]
@@ -66,7 +74,6 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
 
                 val_outputs = net(val_inputs)
                 ce_l, bce_l, fl_l, dice, generalized_dice, twersky_dice, focal_dice = losses_fn(val_outputs, val_labels)
-                #bce_l = losses_fn(val_outputs, val_labels)
                 dice_l = [dice, generalized_dice, twersky_dice, focal_dice]
                 val_loss = generalized_dice #ce_l + fl_l + sum(dice_l)
                 val_running_loss += val_loss.item()
@@ -74,7 +81,28 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                 bce_t += bce_l.item()
                 fl_t += fl_l.item()
                 dice_t = [x.item() + y for (x,y) in zip(dice_l, dice_t)]
-            
+                
+                # save 5 images per epoch for testing
+                if j < 5:
+                    
+                    if not os.path.isdir(os.path.join("val_images", str(epoch))):
+                        os.mkdir(os.path.join("val_images", str(epoch)))
+                    
+                    if torch.cuda.is_available():
+                        val_inputs = val_inputs.cpu()
+                        val_outputs = val_outputs.cpu()
+                        val_labels = val_labels.cpu()
+
+                    img = torchcpu_to_opencv(val_inputs[0])
+                    gt = torchcpu_to_opencv(val_labels[0])
+                    out = torchcpu_to_opencv(val_outputs[0])
+                    
+                    imgpath = os.path.join("val_images", str(epoch), str(j)) 
+
+                    cv2.imwrite(imgpath+"_img.png", img)
+                    cv2.imwrite(imgpath+"_gt.png", gt)
+                    cv2.imwrite(imgpath+"_pred.png", out)
+
             num_avg = float(len(valdataloader)*val_inputs.shape[0])
             val_running_loss /= float(num_avg)
 
@@ -110,16 +138,20 @@ def load_recent_model(saved_dir, net):
         return -1
 
 if __name__ == "__main__":
-    
+
     #TODO Discretized image sizes to closest multiple of 8
    
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--batch_size", default=7, type=int, help="imgsize -> batchsize: 256 -> 7; 128 -> 20;")
+    args = ap.parse_args()
+
    # Training script
 
-    train_dataloader = DataLoader(fish_train_dataset, shuffle=True, batch_size=7, num_workers=3)
+    train_dataloader = DataLoader(fish_train_dataset, shuffle=True, batch_size=args.batch_size, num_workers=3)
     val_dataloader = DataLoader(fish_val_dataset, shuffle=False, batch_size=1, num_workers=1)
     
     #optimizer = optim.SGD(vgg_unet.parameters(), lr=0.0001, momentum=0.9)
-    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.01)
+    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.005)
 
     model_dir = "vgg/"
     save_dir = "models/"+model_dir
@@ -129,6 +161,7 @@ if __name__ == "__main__":
     start_epoch = load_recent_model(save_dir, vgg_unet)
 
     vgg_unet = vgg_unet.cuda()
-
-    train(vgg_unet, train_dataloader, val_dataloader, losses_fn, optimizer, save_dir=save_dir, start_epoch=start_epoch, log_every=100)
+    
+    train(vgg_unet, train_dataloader, val_dataloader, losses_fn, optimizer, save_dir=save_dir, start_epoch=start_epoch, 
+            log_every = len(train_dataloader) // 5)
 

@@ -8,7 +8,7 @@ from .dropout import StochasticDropout
 
 class DeconvNormActivation(nn.Module):
     
-    def __init__(self, in_channels, out_channels, kernel_size, stride, groups = 1, padding=None, num_blocks=2, bias=True, dropout_p=0.05):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, groups = 1, padding=None, num_blocks=2, bias=False, dropout_p=0.05):
         
         super().__init__()
         
@@ -21,7 +21,7 @@ class DeconvNormActivation(nn.Module):
                                         stride = stride,
                                         groups = groups,
                                         padding=padding,
-                                        bias=bias and idx > 0)
+                                        bias=bias)
             batchnorm = nn.BatchNorm2d(out_channels)
             activation = nn.SiLU()
 
@@ -83,7 +83,7 @@ class VGGUNetDecoder(nn.Module):
                                                 if idx!=0 else None
                                     for idx in range(len(channels)-1)])
 
-        self.final_conv = DeconvNormActivation(channels[-1], 1, 1, 1, padding=0, dropout_p=0.)
+        self.final_conv = DeconvNormActivation(channels[-1], 1, 1, 1, padding=0, dropout_p=0., bias=True, num_blocks=1)
         self.channels = channels
         self.upsample = upsample
     
@@ -182,7 +182,7 @@ class VGGUNet(nn.Module):
         x, encoder_tensors = self.encoder.forward(x)
         x = self.decoder.forward(x, encoder_tensors)
 
-        return torch.softmax(x, dim=1)
+        return x
 
 if __name__ == "__main__":
     
