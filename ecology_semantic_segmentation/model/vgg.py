@@ -54,10 +54,11 @@ class VGGUNetDecoder(nn.Module):
 
         assert len(channels) == len(upsample) 
 
-        channels.insert(0, channels[0])
-
         if max_channels != 512:
             channels = [x for x in channels if x <= max_channels]
+            upsample = upsample[-len(channels):]
+        
+        channels.insert(0, channels[0])
 
         self.channel_blocks = nn.ModuleList([
                                 DeconvNormActivation(
@@ -66,10 +67,10 @@ class VGGUNetDecoder(nn.Module):
                                         kernel_size=3, 
                                         stride=1, 
                                         padding=1,
-                                        num_blocks = 1 if idx==0 else 2,
+                                        num_blocks = 1 if idx==0 and max_channels==512 else 2,
                                         dropout_p = dropout_p if dropout_min_channels <= channels[idx+1] else 0.) \
                                     for idx in range(len(channels)-1)])
-
+        
         self.conv_blocks = nn.ModuleList([
                                 DeconvNormActivation(
                                         channels[idx+1], 
@@ -89,10 +90,10 @@ class VGGUNetDecoder(nn.Module):
     def forward(self, x, encoder_tensors):
         
         encoder_concat_index = 0
-
+        
         for index, (block1, block2) in \
             enumerate(zip(self.channel_blocks, self.conv_blocks)):
-
+            
             if self.upsample[index]:
                 x = F.interpolate(x, scale_factor=2)   
                 x = torch.cat((encoder_tensors[encoder_concat_index], x), dim=1)
@@ -168,7 +169,6 @@ class VGGUNet(nn.Module):
         super().__init__()
 
         self.encoder = VGGUNetEncoder(vgg_classifier, img_size, max_channels, dropout_p, dropout_min_channels)
-        print (self.encoder)
         self.decoder = VGGUNetDecoder(max_channels=max_channels, dropout_p=dropout_p, dropout_min_channels=dropout_min_channels)
         
         self.dropout_p, self.dropout_min_channels = dropout_p, dropout_min_channels
@@ -198,6 +198,6 @@ if __name__ == "__main__":
 #    decoder = VGGUNetDecoder()
 #    print (summary(decoder, (512, 8, 8)))
     
-    net = VGGUNet(net, max_channels=256, dropout_p=0.05, dropout_min_channels=256)
+    net = VGGUNet(net, max_channels=128, dropout_p=0.05, dropout_min_channels=256)
     net=  net.cuda()
     print (summary(net, (3,256,256)))
