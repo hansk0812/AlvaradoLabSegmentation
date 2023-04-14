@@ -54,7 +54,11 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             fl_t+= fl_l.item()
             
             dice_t = [x.item() + y for (x,y) in zip(dice_l, dice_t)]
-            if i % log_every == log_every-1:    # print every log_every mini-batches
+
+            if log_every == 0:
+                log_every = 1
+            if len(traindataloader) < log_every or \
+               i % log_every == log_every-1:    # print every log_every mini-batches
                 
                 if epoch % 10 == 0:
                     torch.save(net.state_dict(), "%s/%s_epoch%d.pt" % (save_dir, "densenet", epoch))
@@ -151,7 +155,7 @@ if __name__ == "__main__":
     val_dataloader = DataLoader(fish_val_dataset, shuffle=False, batch_size=1, num_workers=1)
     
     #optimizer = optim.SGD(vgg_unet.parameters(), lr=0.0001, momentum=0.9)
-    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.005)
+    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.01)
 
     model_dir = "vgg/"
     save_dir = "models/"+model_dir
