@@ -198,6 +198,6 @@ if __name__ == "__main__":
 #    decoder = VGGUNetDecoder()
 #    print (summary(decoder, (512, 8, 8)))
     
-    net = VGGUNet(net, max_channels=128, dropout_p=0.05, dropout_min_channels=256)
+    net = VGGUNet(net, max_channels=64, dropout_p=0.05, dropout_min_channels=256)
     net=  net.cuda()
     print (summary(net, (3,256,256)))
