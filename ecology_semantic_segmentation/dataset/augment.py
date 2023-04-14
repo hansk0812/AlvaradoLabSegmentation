@@ -11,10 +11,10 @@ def augment_fn(image, masks):
 
     transforms = A.Compose([
                         A.OneOf([
-                               Defocus(p=1),
-                               GaussianBlur(p=1),
-                               ZoomBlur(p=1),
-                               RandomFog(p=0.4),
+                               Defocus(radius = (3, 3), alias_blur = (0.1, 0.1), p = 1),
+                               GaussianBlur(ksize = 3, p = 1),
+                               ZoomBlur(max_factor = 1.31, step_factor = (0.01, 0.03), p = 1),
+                               RandomFog(fog_coef_lower = 0.3, fog_coef_upper = 1, alpha_coef = 0.08, p = 0.4),
                            ], p=0.2),
                         A.OneOf([
                                 ColorJitter(hue=0.4, brightness=0.4, contrast=0.4, saturation=0.4, p=0.3),
