@@ -30,9 +30,12 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
 
             # forward + backward + optimize
             outputs = net(inputs)
+            
             ce_l, bce_l, fl_l, dice, generalized_dice, twersky_dice, focal_dice = losses_fn(outputs, labels)
+            #bce_l = losses_fn(outputs, labels)
             dice_l = [dice, generalized_dice, twersky_dice, focal_dice]
-            loss = bce_l #F.binary_cross_entropy(outputs, labels)  #ce_l + fl_l + sum(dice_l)
+            
+            loss = generalized_dice #bce_l #ce_l + fl_l + sum(dice_l)
             loss.backward()
             optimizer.step()
 
@@ -49,8 +52,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                     torch.save(net.state_dict(), "%s/%s_epoch%d.pt" % (save_dir, "densenet", epoch))
 
                 print("Epoch: %d ; Batch: %d/%d : Training Loss: %.8f" % (epoch+1, i+1, len(traindataloader), running_loss / log_every))
-                print ("\t Cross-Entropy: %0.8f; Focal Loss: %0.8f; Dice Loss: %0.8f [D: %.8f, GD: %.8f, TwD: %.8f, FocD: %.8f]" % (
-                            ce_t/float(log_every), fl_t/float(log_every), sum([x/float(log_every) for x in dice_t]), 
+                print ("\t Cross-Entropy: %0.8f; BCE: %.8f; Focal Loss: %0.8f; Dice Loss: %0.8f [D: %.8f, GD: %.8f, TwD: %.8f, FocD: %.8f]" % (
+                            ce_t/float(log_every), bce_t/float(log_every), fl_t/float(log_every), sum([x/float(log_every) for x in dice_t]), 
                             dice_t[0]/float(log_every), dice_t[1]/float(log_every), dice_t[2]/float(log_every), dice_t[3]/float(log_every)))
                 
                 running_loss, ce_t, fl_t, dice_t = 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0]
@@ -63,8 +66,9 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
 
                 val_outputs = net(val_inputs)
                 ce_l, bce_l, fl_l, dice, generalized_dice, twersky_dice, focal_dice = losses_fn(val_outputs, val_labels)
+                #bce_l = losses_fn(val_outputs, val_labels)
                 dice_l = [dice, generalized_dice, twersky_dice, focal_dice]
-                val_loss = bce_l #F.binary_cross_entropy(val_outputs, val_labels) #ce_l + fl_l + sum(dice_l)
+                val_loss = generalized_dice #ce_l + fl_l + sum(dice_l)
                 val_running_loss += val_loss.item()
                 ce_t += ce_l.item()
                 bce_t += bce_l.item()
@@ -77,8 +81,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
         scheduler.step(val_running_loss)
 
         print("\nVal Loss: %.8f!" % val_running_loss)
-        print ("\t Cross-Entropy: %0.8f; Focal Loss: %0.8f; Dice Loss: %0.8f [D: %.8f, GD: %.8f, TwD: %.8f, FocD: %.8f]" % (
-                    ce_t/float(num_avg), fl_t/float(num_avg), sum([x/float(num_avg) for x in dice_t]), 
+        print ("\t Cross-Entropy: %0.8f; BCE: %.8f; Focal Loss: %0.8f; Dice Loss: %0.8f [D: %.8f, GD: %.8f, TwD: %.8f, FocD: %.8f]" % (
+                    ce_t/float(num_avg), bce_t/float(num_avg), fl_t/float(num_avg), sum([x/float(num_avg) for x in dice_t]), 
                     dice_t[0]/float(num_avg), dice_t[1]/float(num_avg), dice_t[2]/float(num_avg), dice_t[3]/float(num_avg)))
 
     print('finished training')
@@ -114,8 +118,8 @@ if __name__ == "__main__":
     train_dataloader = DataLoader(fish_train_dataset, shuffle=True, batch_size=7, num_workers=3)
     val_dataloader = DataLoader(fish_val_dataset, shuffle=False, batch_size=1, num_workers=1)
     
-    optimizer = optim.SGD(vgg_unet.parameters(), lr=0.0001, momentum=0.9)
-    #optimizer = optim.Adam(vgg_unet.parameters(), lr=0.001)
+    #optimizer = optim.SGD(vgg_unet.parameters(), lr=0.0001, momentum=0.9)
+    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.01)
 
     model_dir = "vgg/"
     save_dir = "models/"+model_dir
