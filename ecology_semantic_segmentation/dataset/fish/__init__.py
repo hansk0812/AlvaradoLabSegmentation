@@ -6,13 +6,19 @@ composite_labels = []
 
 from .fish_dataset import FishDataset, FishSubsetDataset
 
+import os
 try:
-    import os
     SAMPLE_DATASET = bool(os.environ["SAMPLE"])
 except Exception:
     SAMPLE_DATASET = False
+try:
+    IMG_SIZE = int(os.environ["IMGSIZE"])
+except Exception:
+    IMG_SIZE = 256
 
-fish_train_dataset = FishDataset(dataset_type="segmentation/composite", sample_dataset=SAMPLE_DATASET)
+fish_train_dataset = FishDataset(dataset_type="segmentation/composite", 
+                                 img_shape=IMG_SIZE, 
+                                 sample_dataset=SAMPLE_DATASET)
 print ("train dataset: %d images" % len(fish_train_dataset))
 
 fish_val_datasets, val_cumsum_lengths, \

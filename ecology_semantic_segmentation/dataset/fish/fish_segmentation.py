@@ -87,8 +87,6 @@ class SegmentationDataset(Dataset):
                 segment[segment > 245] = 0
                 segment[segment != 0] = 255
                 
-                cv2.imwrite("f.png", segment); 
-                
                 area_of_segment = segment.sum() / 255.0
                 
                 if area_of_segment * 255 < (self.min_segment_positivity_ratio * self.img_shape * self.img_shape):
