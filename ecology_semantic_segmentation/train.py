@@ -9,6 +9,7 @@ from . import vgg_unet
 from .loss_functions import cross_entropy_loss, focal_loss, classification_dice_loss
 
 #import get_deepfish_dataset
+import random
 import numpy as np
 import cv2
 
@@ -27,9 +28,10 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
 
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.75, patience=30, verbose=True) 
     
-    [dataset.dataset.set_augment_flag(True) for dataset in traindataloader.dataset.datasets]
     for epoch in range(start_epoch+1, num_epochs):  # loop over the dataset multiple times
 
+        [dataset.dataset.set_augment_flag(True) for dataset in traindataloader.dataset.datasets]
+        
         running_loss, ce_t, bce_t, fl_t, dice_t = 0.0, 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0]
         for i, data in enumerate(traindataloader, 0):
             # get the inputs; data is a list of [inputs, labels]
@@ -154,7 +156,8 @@ if __name__ == "__main__":
 
    # Training script
 
-    train_dataloader = DataLoader(fish_train_dataset, shuffle=True, batch_size=args.batch_size, num_workers=3)
+    train_dataloader = DataLoader(fish_train_dataset, shuffle=True, batch_size=args.batch_size, num_workers=3, \
+                                    worker_init_fn=lambda _: np.random.seed(random.randint(0, 2**32 - 1)))
     val_dataloader = DataLoader(fish_val_dataset, shuffle=False, batch_size=1, num_workers=1)
     
     #optimizer = optim.SGD(vgg_unet.parameters(), lr=0.0001, momentum=0.9)
