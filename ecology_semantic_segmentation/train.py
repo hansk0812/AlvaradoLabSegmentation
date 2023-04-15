@@ -26,6 +26,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
         os.mkdir("val_images")
 
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.75, patience=30, verbose=True) 
+    
+    [dataset.dataset.set_augment_flag(True) for dataset in traindataloader.dataset.datasets]
     for epoch in range(start_epoch+1, num_epochs):  # loop over the dataset multiple times
 
         running_loss, ce_t, bce_t, fl_t, dice_t = 0.0, 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0]
@@ -38,12 +40,12 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             optimizer.zero_grad()
 
             # forward + backward + optimize
-            outputs = net(inputs)
+            outputs = torch.softmax(net(inputs), dim=1)
             
             ce_l, bce_l, fl_l, dice, generalized_dice, twersky_dice, focal_dice = losses_fn(outputs, labels)
             dice_l = [dice, generalized_dice, twersky_dice, focal_dice]
             
-            loss = sum(dice_l) #bce_l #ce_l + fl_l + 
+            loss = generalized_dice + dice + twersky_dice #bce_l #ce_l + fl_l + sum(dice_l)
             loss.backward()
             optimizer.step()
 
@@ -70,6 +72,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                 
                 running_loss, ce_t, bce_t, fl_t, dice_t = 0.0, 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0]
         
+        [dataset.dataset.set_augment_flag(False) for dataset in valdataloader.dataset.datasets]
         with torch.no_grad():
             val_running_loss, ce_t, bce_t, fl_t, dice_t = 0.0, 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0]
             for j, val_data in enumerate(valdataloader, 0):

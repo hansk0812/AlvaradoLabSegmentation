@@ -62,8 +62,13 @@ class SegmentationDataset(Dataset):
         else:
             self.label_indices = list(range(len(composite_labels)))
 
+        self.set_augment_flag(True)
+
     def __len__(self):
         return len(self.segmentation_keys)
+    
+    def set_augment_flag(self, flag):
+        self.augment_flag = flag
 
     def __getitem__(self, idx):
         
@@ -99,7 +104,8 @@ class SegmentationDataset(Dataset):
                 traceback.print_exc()
                 segment_array[:, :, organ_index].fill(-1) 
         
-        image, segment_array = augment_fn(image, segment_array)
+        if self.augment_flag:
+            image, segment_array = augment_fn(image, segment_array)
 
         return image.transpose((2,0,1)).astype(np.float32), segment_array.transpose((2,0,1)).astype(np.float32), segments_paths[organ]
 
