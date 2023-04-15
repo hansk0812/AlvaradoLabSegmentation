@@ -87,6 +87,11 @@ class CocoSegmentationDataset(Dataset):
             del self.polygons[del_idx]
         
         assert len(self.image_paths) == len(self.polygons)
+        
+        self.set_augment_flag(True)
+
+    def set_augment_flag(self, flag):
+        self.augment_flag = flag
 
     def __len__(self):
         return len(self.image_paths)
@@ -114,7 +119,8 @@ class CocoSegmentationDataset(Dataset):
 
             segment_array[:, :, organ_index] = seg 
         
-        image, segment_array = augment_fn(image, segment_array)
+        if self.augment_flag:
+            image, segment_array = augment_fn(image, segment_array)
 
         return image.transpose((2,0,1)).astype(np.float32), segment_array.transpose((2,0,1)).astype(np.float32), image_path
 
