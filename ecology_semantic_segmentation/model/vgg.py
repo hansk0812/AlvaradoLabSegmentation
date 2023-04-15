@@ -23,7 +23,7 @@ class DeconvNormActivation(nn.Module):
                                         padding=padding,
                                         bias=bias)
             batchnorm = nn.BatchNorm2d(out_channels)
-            activation = nn.SiLU()
+            activation = nn.ReLU()
 
             self.block.append(deconv)
             self.block.append(batchnorm)
