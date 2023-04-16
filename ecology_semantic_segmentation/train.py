@@ -145,7 +145,6 @@ def losses_fn(x, g):
 def load_recent_model(saved_dir, net):
     
     try:
-                    torch.save(net.state_dict(), ))
         model_file = sorted(glob.glob(os.path.join(save_dir, 
                         "channels%d" % MAXCHANNELS, "img%d" % IMGSIZE, "vgg_unet", "*")), \
                             key=lambda x: int(x.split("epoch")[-1].split('.')[0]))[-1]
