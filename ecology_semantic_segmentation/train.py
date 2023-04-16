@@ -1,6 +1,16 @@
 import argparse
 
 import os
+try:
+    IMGSIZE = os.environ("IMGSIZE")
+except Exception:
+    IMGSIZE = 256
+try:
+    MAXCHANNELS = os.environ("IMGSIZE")
+except Exception:
+    MAXCHANNELS = 256
+
+
 import glob
 import traceback
 
@@ -42,17 +52,16 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             optimizer.zero_grad()
 
             # forward + backward + optimize
-            outputs = torch.softmax(net(inputs), dim=1)
-            
+            outputs = net(inputs)
             ce_l, bce_l, fl_l, dice, generalized_dice, twersky_dice, focal_dice = losses_fn(outputs, labels)
             dice_l = [dice, generalized_dice, twersky_dice, focal_dice]
-            
-            loss = generalized_dice + dice + twersky_dice #bce_l #ce_l + fl_l + sum(dice_l)
+            loss = bce_l #dice + generalized_dice + twersky_dice
+            #loss = bce_l #+ dice + twersky_dice #bce_l #ce_l + fl_l + sum(dice_l)
             loss.backward()
             optimizer.step()
 
             # print statistics
-            running_loss += loss.item()
+            running_loss += bce_l.item()
             ce_t+= ce_l.item()
             bce_t+= bce_l.item()
             fl_t+= fl_l.item()
@@ -65,7 +74,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                i % log_every == log_every-1:    # print every log_every mini-batches
                 
                 if epoch % 10 == 0:
-                    torch.save(net.state_dict(), "%s/%s_epoch%d.pt" % (save_dir, "densenet", epoch))
+                    torch.save(net.state_dict(), "%s/%s/%s/%s_epoch%d.pt" % (save_dir, 
+                        "channels%d" % MAXCHANNELS, "img%d" % IMGSIZE, "vgg_unet", epoch))
 
                 print("Epoch: %d ; Batch: %d/%d : Training Loss: %.8f" % (epoch+1, i+1, len(traindataloader), running_loss / log_every))
                 print ("\t Cross-Entropy: %0.8f; BCE: %.8f; Focal Loss: %0.8f; Dice Loss: %0.8f [D: %.8f, GD: %.8f, TwD: %.8f, FocD: %.8f]" % (
@@ -80,8 +90,10 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             for j, val_data in enumerate(valdataloader, 0):
                 val_inputs, val_labels, _ = val_data
                 val_inputs, val_labels = val_inputs.cuda(), val_labels.cuda()
-
-                val_outputs = net(val_inputs)
+                
+                val_outputs = torch.sigmoid(net(val_inputs))
+                #print (val_inputs.min(), val_inputs.max(), val_outputs.min(), val_outputs.max())
+                
                 ce_l, bce_l, fl_l, dice, generalized_dice, twersky_dice, focal_dice = losses_fn(val_outputs, val_labels)
                 dice_l = [dice, generalized_dice, twersky_dice, focal_dice]
                 val_loss = generalized_dice #ce_l + fl_l + sum(dice_l)
@@ -133,7 +145,9 @@ def losses_fn(x, g):
 def load_recent_model(saved_dir, net):
     
     try:
-        model_file = sorted(glob.glob(os.path.join(saved_dir, "*")), \
+                    torch.save(net.state_dict(), ))
+        model_file = sorted(glob.glob(os.path.join(save_dir, 
+                        "channels%d" % MAXCHANNELS, "img%d" % IMGSIZE, "vgg_unet", "*")), \
                             key=lambda x: int(x.split("epoch")[-1].split('.')[0]))[-1]
 
         start_epoch = int(model_file.split("epoch")[-1].split('.')[0])
@@ -159,9 +173,6 @@ if __name__ == "__main__":
     train_dataloader = DataLoader(fish_train_dataset, shuffle=True, batch_size=args.batch_size, num_workers=3, \
                                     worker_init_fn=lambda _: np.random.seed(random.randint(0, 2**32 - 1)))
     val_dataloader = DataLoader(fish_val_dataset, shuffle=False, batch_size=1, num_workers=1)
-    
-    #optimizer = optim.SGD(vgg_unet.parameters(), lr=0.0001, momentum=0.9)
-    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.01)
 
     model_dir = "vgg/"
     save_dir = "models/"+model_dir
@@ -171,6 +182,9 @@ if __name__ == "__main__":
     start_epoch = load_recent_model(save_dir, vgg_unet)
 
     vgg_unet = vgg_unet.cuda()
+    
+    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.001)
+    #optimizer = optim.SGD(vgg_unet.parameters(), lr=0.001, momentum=0.9)
     
     train(vgg_unet, train_dataloader, val_dataloader, losses_fn, optimizer, save_dir=save_dir, start_epoch=start_epoch, 
             log_every = len(train_dataloader) // 5)
