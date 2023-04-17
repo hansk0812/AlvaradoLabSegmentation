@@ -27,13 +27,17 @@ BBOX_ANNOTATION_FILES = [
 DATA_DIR = "/home/hans/data/bbox_to_segmentation_gt/"
 for fls in BBOX_ANNOTATION_FILES:
     img = fls[0]
-
+    
     try:
         os.mkdir(os.path.join(DATA_DIR, "original image"))
     except Exception:
         pass
+    
+    if not os.path.exists(img):
+        print ("Skipping %s" % '/'.join(img.split('/')[-3:]))
+        continue
 
-    shutil.copyfile(img, os.path.join(DATA_DIR, "original image", img.split('/')[-1]))
+    os.rename(img, os.path.join(DATA_DIR, "original image", img.split('/')[-1]))
     
     ATLEAST_ONE = False
     for directory in glob.glob(os.path.join(os.path.dirname(os.path.dirname(img)), '*')):
@@ -60,6 +64,10 @@ def create_mask(img_shape, img_file, mask_file, color=WHITE):
     # Create bounding box based on white background
 
     img = cv2.imread(img_file)
+    
+    if img is None:
+        return 
+
     img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     
     mask = cv2.imread(mask_file)
@@ -76,7 +84,6 @@ def create_mask(img_shape, img_file, mask_file, color=WHITE):
      
     #mask = cv2.resize(mask, (y2-y1+1, x2-x1+1))
     mask_ret = np.zeros_like(img[:,:,:1])
-    print (mask.shape, mask_ret.shape)
     #mask_ret[x1:x2+1, y1:y2+1, 0] = mask
     
     cv2.imshow('f', img)
@@ -87,7 +94,5 @@ def create_mask(img_shape, img_file, mask_file, color=WHITE):
     cv2.imwrite("sample_img.png", img)
 
 for data in BBOX_ANNOTATION_FILES:
-    print (data)
     imgpath, annpath, color = data[0], data[1], data[2]
-    print (os.path.exists(imgpath), imgpath, os.path.exists(annpath), annpath)
     create_mask((256,256,3), imgpath, annpath, color)
