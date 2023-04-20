@@ -1,6 +1,7 @@
 models/
 log.txt
 val_images/
+*/gray/gray*
 
 #Pytorch
 *.pth
