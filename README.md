@@ -1,4 +1,9 @@
 # AlvaradoLabSegmentation
+Dataset Tools:
+
+Use Python script to separate cropped segmentation parts and use it for semantic segmentation labels
+`python -m ecology_semantic_segmentation.dataset.utils` 
+
 U-Net based Semantic Segmentation
 
 Available Backbones:
