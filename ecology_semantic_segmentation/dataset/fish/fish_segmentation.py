@@ -12,6 +12,7 @@ from torch.utils.data import Dataset
 from . import composite_labels
 
 from ..augment import augment_fn
+from ..bbox_masks_problem import remove_islands_in_segment_gt
 
 def imread(file_path):
     
@@ -100,7 +101,10 @@ class SegmentationDataset(Dataset):
                 segment = cv2.cvtColor(segment, cv2.COLOR_BGR2GRAY)
                 
                 segment = cv2.bitwise_not(segment)
-
+                segment[segment>0] = 1
+                
+                segment = remove_islands_in_segment_gt(segment)
+                
                 # Decide using this image: Machine learning training set (copy)/photos 1.30.2019/original image/f132C.png
                 #SEGMENT_THRESHOLD = 225
                 #segment[segment > SEGMENT_THRESHOLD] = 0
