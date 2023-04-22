@@ -13,6 +13,33 @@ import numpy as np
 
 from .composite_bboxes import BBOX_ANNOTATION_FILES
 
+def return_bbox_corrected_annotations(imgpath, maskpath):
+    img_np, mask_np = cv2.imread(imgpath), cv2.imread(maskpath)
+    
+    mask_binary = mask_np.copy()
+    mask_binary[mask_binary > 225] = 0
+    mask_binary[mask_binary > 0] = 1
+
+    img_np = cv2.cvtColor(img_np, cv2.COLOR_BGR2GRAY)
+    mask_binary = cv2.cvtColor(mask_binary, cv2.COLOR_BGR2GRAY)
+    mask_np = cv2.cvtColor(mask_np, cv2.COLOR_BGR2GRAY)
+    
+    annotations[part] = mask_np 
+    
+    loc = np.zeros((img_np.shape[0]-mask_np.shape[0]+1, img_np.shape[1]-mask_np.shape[1]+1))
+    for idx in range(0, img_np.shape[0]-mask_np.shape[0]+1):
+        for jdx in range(0, img_np.shape[1]-mask_np.shape[1]+1):
+            new_mask = img_np[idx:idx+mask_np.shape[0], jdx:jdx+mask_np.shape[1]] * mask_binary
+            loc[idx][jdx] = np.sum((new_mask - mask_np)**2) #ssim(new_mask, mask_np, data_range=new_mask.max() - new_mask.min())
+
+    min_idxs = np.unravel_index(loc.argmin(), loc.shape)
+    
+    mask_save = np.zeros_like(img_np)
+    mask_save[min_idxs[0]: min_idxs[0]+mask_np.shape[0], min_idxs[1]:min_idxs[1]+mask_np.shape[1]] = mask_np
+    #mask_save[mask_save>225] = 0 # white pixels as background?
+
+    return mask_save
+
 # Tried thresholding but found similarity based brute force bbox assignment to work better for "whole body" annotations
 WHITE = ((0, 0, 237), (181, 25, 255))
 BLACKGREY = ((0, 0, 0), (180, 255, 35))
@@ -61,31 +88,9 @@ for idx, img in enumerate(original_images):
                     continue
 
                 shutil.copyfile(mask, os.path.join(DATA_DIR, part, mask.split('/')[-1]))
-                
-                img_np, mask_np = cv2.imread(img), cv2.imread(mask)
-                
-                mask_binary = mask_np.copy()
-                mask_binary[mask_binary > 225] = 0
-                mask_binary[mask_binary > 0] = 1
+               
+                mask_save = return_bbox_corrected_annotations(img, mask)
 
-                img_np = cv2.cvtColor(img_np, cv2.COLOR_BGR2GRAY)
-                mask_binary = cv2.cvtColor(mask_binary, cv2.COLOR_BGR2GRAY)
-                mask_np = cv2.cvtColor(mask_np, cv2.COLOR_BGR2GRAY)
-                
-                annotations[part] = mask_np 
-                
-                loc = np.zeros((img_np.shape[0]-mask_np.shape[0]+1, img_np.shape[1]-mask_np.shape[1]+1))
-                for idx in range(0, img_np.shape[0]-mask_np.shape[0]+1):
-                    for jdx in range(0, img_np.shape[1]-mask_np.shape[1]+1):
-                        new_mask = img_np[idx:idx+mask_np.shape[0], jdx:jdx+mask_np.shape[1]] * mask_binary
-                        loc[idx][jdx] = np.sum((new_mask - mask_np)**2) #ssim(new_mask, mask_np, data_range=new_mask.max() - new_mask.min())
-
-                min_idxs = np.unravel_index(loc.argmin(), loc.shape)
-                
-                mask_save = np.zeros_like(img_np)
-                mask_save[min_idxs[0]: min_idxs[0]+mask_np.shape[0], min_idxs[1]:min_idxs[1]+mask_np.shape[1]] = mask_np
-                mask_save[mask_save>225] = 0
-                
                 cv2.imwrite(os.path.join(DATA_DIR, part, mask.split('/')[-1]), mask_save)
                 os.remove(mask)
 
@@ -104,7 +109,7 @@ for idx, img in enumerate(original_images):
     os.remove(img)
 
 # To ensure delete happens after checking the current state of newly created dataset
-exit()
+#exit()
 
 for fl in original_images:
     img_name = fl.split('/')[-1].split('.')[0]
