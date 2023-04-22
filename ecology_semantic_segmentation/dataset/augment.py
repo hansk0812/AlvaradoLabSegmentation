@@ -9,41 +9,43 @@ from albumentations.augmentations.blur.transforms import GaussianBlur, Defocus, 
 
 def augment_fn(image, masks):
 
+    return image, masks
+    
     transforms = A.Compose([
                         A.OneOf([
                                Defocus(radius = (3, 3), alias_blur = (0.1, 0.1), p = 1),
                                GaussianBlur(blur_limit = (3,3), sigma_limit = (0.2,0.2), p = 1),
-                               ZoomBlur(max_factor = 1.31, step_factor = (0.01, 0.03), p = 1),
+                               ZoomBlur(max_factor = 1.11, step_factor = (0.01, 0.02), p = 1),
                                RandomFog(fog_coef_lower = 0.3, fog_coef_upper = 1, alpha_coef = 0.08, p = 0.4),
-                           ], p=0.2),
+                           ], p=0.3),
                         A.OneOf([
                                 ColorJitter(hue=0.4, brightness=0.4, contrast=0.4, saturation=0.4, p=0.3),
                                 A.RandomBrightnessContrast(p=0.5),
                                 A.RandomGamma(p=0.5),
                                 Emboss(alpha=(0.3, 0.6), strength=(0.3, 0.7), p=0.3),
-                            ], p=0.3),
+                            ], p=0.4),
 #                        A.OneOf([
 #                            A.RandomCrop(width=128, height=128, p=0.5),
 #                            A.RandomCrop(width=64, height=64, p=0.5),
 #                            ], p=0.5),
 # Batch Size 1 for random sizes training
                        A.HorizontalFlip(p=0.5),
-                       FancyPCA(p=0.5, alpha=0.75),
-                       ], p=0.7)
+                       FancyPCA(p=0.5, alpha=0.35),
+                       ], p=0.6)
 
-    transform = transforms(image=image, masks=[masks[:,:,idx:idx+1] for idx in range(masks.shape[2])])
+    transform = transforms(image=image, mask=masks)
+    image, masks = transform["image"], np.array(transform["mask"])
     
-    if np.random.rand() < 0.5:
+    if np.random.rand() < 0.4:
         color_transform = HueSaturationValue(p = 1, hue_shift_limit = [-60, 60], sat_shift_limit = [-60, 60], val_shift_limit = [-30, 30])
         image = color_transform(image=image)["image"]
     
-    if np.random.rand() < 0.5:
+    if np.random.rand() < 0.7:
         clahe_transform = CLAHE(p=1, clip_limit = [1, 4.0], tile_grid_size= [8, 8])  
         image = clahe_transform(image=image)["image"]
-
-    image, masks = transform["image"], np.array(transform["masks"]).transpose((1,2,0,3))[...,0]
     
-    image, masks = Arotate(image, masks, p=1)
+    if np.random.rand() < 0.4:
+        image, masks = Arotate(image, masks, p=1)
     
     return image, masks
 
@@ -74,15 +76,15 @@ if __name__ == "__main__":
                        segment.transpose((1,2,0)).astype(np.uint8)*255
         print ("saving f.png")
         cv2.imwrite('f.png', img)
-        #cv2.imwrite('fm.png', segment[:,:,0])
-        print (img.shape, segment.shape, img.min(), img.max())
+        cv2.imwrite('fm.png', segment[:,:,0])
         
-        augment_fn = CLAHE(p=1, clip_limit = [1, 4.0], tile_grid_size= [8, 8])
-        aug = augment_fn(image=img)
-        img = aug["image"]
-        #img, segment = augment_fn(img, segment)
+        #augment_fn = CLAHE(p=1, clip_limit = [1, 4.0], tile_grid_size= [8, 8])
+        #aug = augment_fn(image=img)
+        #img = aug["image"]
+        
+        img, segment = augment_fn(img, segment)
         print ("saving g.png")
         cv2.imwrite('g.png', img)
-        #cv2.imwrite('gm.png', segment)
+        cv2.imwrite('gm.png', segment[:,:,0])
 
         time.sleep(4)

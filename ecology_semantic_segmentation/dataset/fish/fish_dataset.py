@@ -153,6 +153,9 @@ if __name__ == "__main__":
     dataset = FishDataset(dataset_type="segmentation/composite", sample_dataset=args.sample_dataset) 
     print ("train dataset: %d images" % len(dataset))
 
+    for img, seg, fname in dataset:
+        print (fname)
+
     val_datasets, val_cumsum_lengths, \
     test_datasets, test_cumsum_lengths = dataset.return_val_test_datasets()
 

@@ -76,7 +76,6 @@ class SegmentationDataset(Dataset):
         with open(bbox_file, 'r') as f:
             bboxes_dict = json.load(f)
         
-        print (bboxes_dict)
         mask = cv2.resize(mask, (256,256)) 
 
     def __getitem__(self, idx):
@@ -97,12 +96,15 @@ class SegmentationDataset(Dataset):
                 segment = imread(segments_paths[organ])
             
                 segment = cv2.resize(segment, (self.img_shape, self.img_shape))
+
                 segment = cv2.cvtColor(segment, cv2.COLOR_BGR2GRAY)
                 
+                segment = cv2.bitwise_not(segment)
+
                 # Decide using this image: Machine learning training set (copy)/photos 1.30.2019/original image/f132C.png
-                SEGMENT_THRESHOLD = 225
-                segment[segment > SEGMENT_THRESHOLD] = 0
-                segment[segment != 0] = 255
+                #SEGMENT_THRESHOLD = 225
+                #segment[segment > SEGMENT_THRESHOLD] = 0
+                #segment[segment != 0] = 255
                 
                 area_of_segment = segment.sum() / 255.0
                 
@@ -119,11 +121,6 @@ class SegmentationDataset(Dataset):
         if self.augment_flag:
             image, segment_array = augment_fn(image, segment_array)
         
-        cv2.imshow('f', image)
-        print (segment_array.shape)
-        cv2.imshow('s', segment_array[:,:,0])
-        cv2.waitKey()
-
         return image.transpose((2,0,1)).astype(np.float32), segment_array.transpose((2,0,1)).astype(np.float32), image_path
 
 def get_ml_training_set_data(dtype, path, folder_path, img_shape, min_segment_positivity_ratio, sample_dataset=True, organs=None):
@@ -144,7 +141,6 @@ def get_ml_training_set_data(dtype, path, folder_path, img_shape, min_segment_po
         
         images = glob.glob(os.path.join(directory, 'original image/*'))
         
-        print (directory, images)
         if sample_dataset:
             images = images[:20]
 

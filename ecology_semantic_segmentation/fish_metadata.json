@@ -47,7 +47,8 @@
 
 	{"folder": "Machine learning training set/",
 	 "name": "ml_training_set",
-	 "type": "segmentation/composite"
+	 "type": "segmentation/composite",
+     "bbox_dependent_images_path": "bbox_to_segmentation_gt/"
 	},
 
 	{"folder": "roboflow/",
