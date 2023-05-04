@@ -20,7 +20,8 @@ from ..augment import augment_fn
 
 class CocoSegmentationDataset(Dataset):
     
-    def __init__(self, coco_images, coco_txt, img_shape, min_segment_positivity_ratio=0.05, organs=None, sample_dataset=True, ann_format="xyxy"):
+    def __init__(self, coco_images, coco_txt, img_shape, min_segment_positivity_ratio=0.05, 
+                    organs=None, sample_dataset=True, ann_format="xyxy", augment_flag = True):
         
         #TODO ann_format
 
@@ -88,7 +89,7 @@ class CocoSegmentationDataset(Dataset):
         
         assert len(self.image_paths) == len(self.polygons)
         
-        self.set_augment_flag(True)
+        self.set_augment_flag(augment_flag)
 
     def set_augment_flag(self, flag):
         self.augment_flag = flag
@@ -121,10 +122,10 @@ class CocoSegmentationDataset(Dataset):
         
         if self.augment_flag:
             image, segment_array = augment_fn(image, segment_array)
+        
+        return image.transpose((2,0,1)).astype(np.float32) /255.0, segment_array.transpose((2,0,1)).astype(np.float32) / 255.0, image_path
 
-        return image.transpose((2,0,1)).astype(np.float32), segment_array.transpose((2,0,1)).astype(np.float32), image_path
-
-def get_alvaradolab_data(dtype, path, folder_path, img_shape, min_segment_positivity_ratio, sample_dataset=True, organs=None):
+def get_alvaradolab_data(dtype, path, folder_path, img_shape, min_segment_positivity_ratio, sample_dataset=True, organs=None, bbox_dir=None, augment_flag = True):
     
     #tracemalloc.start()
     assert dtype == "segmentation/composite"
@@ -141,7 +142,7 @@ def get_alvaradolab_data(dtype, path, folder_path, img_shape, min_segment_positi
         del images[idx]
         del labels[idx]
     
-    dataset = CocoSegmentationDataset(images, labels, img_shape, min_segment_positivity_ratio, sample_dataset=sample_dataset, organs=organs)
+    dataset = CocoSegmentationDataset(images, labels, img_shape, min_segment_positivity_ratio, sample_dataset=sample_dataset, organs=organs, augment_flag=augment_flag)
     print ("Using %d labeled images from dataset: %s!" % (len(dataset), "COCO Segmentation: %s" % path))
     
     """

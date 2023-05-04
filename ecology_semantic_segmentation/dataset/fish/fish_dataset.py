@@ -16,6 +16,7 @@ from . import dataset_splits
 
 from .. import datasets_metadata
 
+# All datasets have get_%s_data
 from .fish_coco_annotator import get_alvaradolab_data
 from .fish_segmentation import get_ml_training_set_data
 
@@ -26,7 +27,7 @@ import traceback
 class FishDataset(Dataset):
 
     def __init__(self, dataset_type="segmentation", img_shape = 256, min_segment_positivity_ratio=0.0075, 
-                 organs=["whole_body"], sample_dataset=True): 
+                 organs=["whole_body"], sample_dataset=True, deepsupervision=False): 
         # min_segment_positivity_ratio is around 0.009 - 0.011 for eye (the smallest part)
         
         global composite_labels
@@ -49,16 +50,24 @@ class FishDataset(Dataset):
         
         self.datasets, self.dataset_cumsum_lengths = [], []
         self.val_datasets, self.test_datasets = [], []
+
         for data in datasets:
             
             dataset_method = "get_%s_data" % data["name"]
+
+            if "bbox_dependent_images_path" in data:
+                bbox_dir = data["bbox_dependent_images_path"]
+            else:
+                bbox_dir = None
             
             try:
                 dataset = getattr(self, dataset_method)(data["type"], data["folder"],
                                                         self.folder_path, 
                                                         img_shape, min_segment_positivity_ratio,
                                                         organs = organs,
-                                                        sample_dataset = sample_dataset) 
+                                                        sample_dataset = sample_dataset,
+                                                        bbox_dir = None, #bbox_dir)
+                                                        augment_flag = True) 
          
                 # create train, val or test sets
                 num_samples = {"train": [0, int(len(dataset) * dataset_splits["train"])]}
@@ -82,6 +91,12 @@ class FishDataset(Dataset):
                 traceback.print_exc()
                 print ("Write generator function for dataset: %s ;" % dataset_method, e)
         
+        self.datasets = list(reversed(self.datasets))
+        self.dataset_cumsum_lengths = [self.dataset_cumsum_lengths[idx] - self.dataset_cumsum_lengths[idx-1] \
+                                            for idx in range(len(self.dataset_cumsum_lengths)-1, 0, -1)] + [self.dataset_cumsum_lengths[-1]]
+    
+        self.deepsupervision = deepsupervision
+
     def return_val_test_datasets(self):
         
         val_cumsum_lengths, test_cumsum_lengths = [], []
@@ -108,42 +123,57 @@ class FishDataset(Dataset):
         while idx >= self.dataset_cumsum_lengths[current_dataset_id]:
             current_dataset_id += 1
         dataset = self.datasets[current_dataset_id]
-        
+
         data_index = idx if current_dataset_id == 0 else \
                 idx - self.dataset_cumsum_lengths[current_dataset_id-1]        
         
-        assert data_index < len(dataset), "%d > %d" % (data_index, len(dataset))
+        assert data_index < len(dataset), \
+                "%d > %d ; Dataset %d / %d" % (data_index, len(dataset), current_dataset_id, len(self.dataset_cumsum_lengths))
         image, segment, filename = dataset[data_index]
-        return image / 255.0, segment / 255.0, filename
+    
+        segment[segment > 0] = 1
+        if self.deepsupervision:
+            small_segments = [np.expand_dims(cv2.resize(segment[0], (idx, idx)), axis=0) for idx in [128, 64, 32, 16, 8]]
+            segment = [segment] + small_segments
+        else:
+            if segment.max() > 1:
+                segment = segment / 255.0
+        if image.max() > 1:
+            image = image / 255.0
+        
+        return image, segment, filename
 
 class FishSubsetDataset(Dataset):
     
-    def __init__(self, datasets, cumsum_lengths, min_segment_positivity_ratio=0.0075):
+    def __init__(self, datasets, cumsum_lengths, min_segment_positivity_ratio=0.0075, deepsupervision=True):
         
         self.min_segment_positivity_ratio = min_segment_positivity_ratio
         self.datasets = datasets
         self.dataset_cumsum_lengths = cumsum_lengths
+
+        self.deepsupervision = deepsupervision
     
     def __len__(self):
         return self.dataset_cumsum_lengths[-1]
 
     def __getitem__(self, idx):
         
-        current_dataset_id = 0
+        current_dataset_id, data_index = 0, idx
         while idx >= self.dataset_cumsum_lengths[current_dataset_id]:
             current_dataset_id += 1
+            data_index = idx - self.dataset_cumsum_lengths[current_dataset_id-1]
         dataset = self.datasets[current_dataset_id]
-        
-        data_index = idx if current_dataset_id == 0 else \
-                idx - self.dataset_cumsum_lengths[current_dataset_id-1]
         
         image, segment, filename = dataset[data_index]
 
-        return image / 255.0, segment / 255.0, filename
+        segment[segment > 0] = 1
+        if self.deepsupervision:
+            small_segments = [np.expand_dims(cv2.resize(segment[0], (idx, idx)), axis=0) for idx in [128, 64, 32, 16, 8]]
+            segment = [segment] + small_segments
+        
+        return image, segment, filename
 
 if __name__ == "__main__":
-   
-    from . import composite_labels 
     
     ap = argparse.ArgumentParser()
     ap.add_argument("--visualize", default="alvaradolab", help="Flag to visualize composite labels")
@@ -153,14 +183,20 @@ if __name__ == "__main__":
     dataset = FishDataset(dataset_type="segmentation/composite", sample_dataset=args.sample_dataset) 
     print ("train dataset: %d images" % len(dataset))
 
-    for img, seg, fname in dataset:
-        print (fname)
-
+       
     val_datasets, val_cumsum_lengths, \
     test_datasets, test_cumsum_lengths = dataset.return_val_test_datasets()
 
     valdataset = FishSubsetDataset(val_datasets, val_cumsum_lengths) 
     print ("val dataset: %d images" % len(valdataset))
+
+    for img, seg, fname in valdataset:
+        img = img.transpose((1,2,0))*255 
+        cv2.imshow("f", img.astype(np.uint8))
+        cv2.imshow("g", (seg[0][0]*255).astype(np.uint8))
+        print (fname)
+        cv2.waitKey()
+
     testdataset = FishSubsetDataset(test_datasets, test_cumsum_lengths) 
     print ("test dataset: %d images" % len(testdataset))
 

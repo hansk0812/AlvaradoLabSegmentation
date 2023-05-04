@@ -17,4 +17,7 @@ except Exception:
 from .dataset.fish import fish_train_dataset, fish_val_dataset, fish_test_dataset
 from .model import vgg_unet
 
-__all__ = ["fish_train_dataset", "fish_val_dataset", "fish_test_dataset", "datasets_metadata"]
+import torch
+binary_cross_entropy = torch.nn.BCEWithLogitsLoss()
+
+__all__ = ["fish_train_dataset", "fish_val_dataset", "fish_test_dataset", "datasets_metadata", "binary_cross_entropy"]

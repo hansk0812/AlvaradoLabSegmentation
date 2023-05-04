@@ -7,10 +7,11 @@ from albumentations.augmentations.transforms import FancyPCA, HueSaturationValue
 from albumentations.augmentations.geometric.functional import rotate
 from albumentations.augmentations.blur.transforms import GaussianBlur, Defocus, ZoomBlur
 
-def augment_fn(image, masks):
+from albumentations.augmentations.domain_adaptation import FDA
 
-    return image, masks
+def augment_fn(image, masks, img_size=256):
     
+    target_image = np.random.randint(0, 256, image.shape, dtype=np.uint8)
     transforms = A.Compose([
                         A.OneOf([
                                Defocus(radius = (3, 3), alias_blur = (0.1, 0.1), p = 1),
@@ -24,6 +25,9 @@ def augment_fn(image, masks):
                                 A.RandomGamma(p=0.5),
                                 Emboss(alpha=(0.3, 0.6), strength=(0.3, 0.7), p=0.3),
                             ], p=0.4),
+                         A.RandomResizedCrop(img_size, img_size, p=0.7),
+                         A.CropAndPad(percent=[60, 40]),
+                         FDA([target_image], p=0.2, read_fn=lambda x: x),
 #                        A.OneOf([
 #                            A.RandomCrop(width=128, height=128, p=0.5),
 #                            A.RandomCrop(width=64, height=64, p=0.5),
@@ -79,8 +83,9 @@ if __name__ == "__main__":
         cv2.imwrite('fm.png', segment[:,:,0])
         
         #augment_fn = CLAHE(p=1, clip_limit = [1, 4.0], tile_grid_size= [8, 8])
-        #aug = augment_fn(image=img)
-        #img = aug["image"]
+        aug = augment_fn(image=img)
+        img = aug["image"]
+        cv2.imwrite('FDA.png', img)
         
         img, segment = augment_fn(img, segment)
         print ("saving g.png")
