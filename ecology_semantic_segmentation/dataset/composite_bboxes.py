@@ -218,5 +218,18 @@ BBOX_ANNOTATION_FILES = [
     "photos 1.30.2019/original image/f149B.jpg",
     "photos 1.30.2019/original image/f61B.jpg",
     "photos 1.30.2019/original image/f101B.jpg",
+    "photos 1.30.2019/original image/f45C.jpg",
+    "photos 1.30.2019/original image/f48B.png",
+    "photos 1.30.2019/original image/f49C.jpg",
+    "photos 1.30.2019/original image/f23C.jpg",
+    "photos 1.30.2019/original image/f167C.png",
+    "photos 1.30.2019/original image/f122C.jpg",
+    "photos 1.30.2019/original image/f114C.jpg",
+    "photos 1.30.2019/original image/f65C.JPG",
+    "photos 1.30.2019/original image/f5C.jpg",
+    "photos 1.30.2019/original image/f7C.jpg",
+    "photos 1.30.2019/original image/f74C.jpg",
+    "12-23-2019/original image/f57B.jpg",
+    "12-23-2019/original image/f54C.jpg",
 ]
 

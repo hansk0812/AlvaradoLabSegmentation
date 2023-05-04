@@ -15,17 +15,24 @@ class DeconvNormActivation(nn.Module):
         self.block = nn.ModuleList([])
 
         for idx in range(num_blocks):
-            deconv = nn.ConvTranspose2d(in_channels = in_channels if idx == 0 else out_channels, 
-                                        out_channels = out_channels, 
-                                        kernel_size = kernel_size, 
-                                        stride = stride,
-                                        groups = groups,
-                                        padding=padding,
-                                        bias=bias)
+            #deconv = nn.ConvTranspose2d(in_channels = in_channels if idx == 0 else out_channels, 
+            #                            out_channels = out_channels, 
+            #                            kernel_size = kernel_size, 
+            #                            stride = stride,
+            #                            groups = groups,
+            #                            padding=padding,
+            #                            bias=bias)
+            conv = nn.Conv2d(in_channels = in_channels if idx == 0 else out_channels, 
+                             out_channels = out_channels, 
+                             kernel_size = kernel_size, 
+                             stride = stride,
+                             groups = groups,
+                             padding=padding,
+                             bias=bias)
             batchnorm = nn.BatchNorm2d(out_channels)
-            activation = nn.ReLU()
+            activation = nn.LeakyReLU()
 
-            self.block.append(deconv)
+            self.block.append(conv) #deconv)
             self.block.append(batchnorm)
             self.block.append(activation)
             
@@ -42,6 +49,7 @@ class DeconvNormActivation(nn.Module):
 class VGGUNetDecoder(nn.Module):
     
     def __init__(self, 
+                 num_classes=1,
                  channels = [512, 512, 512, 512, 512, 256, 256, 128, 64],
                  upsample = [True, False, False, True, False, True, False, True, True],
                  num_blocks = 2,
@@ -67,7 +75,7 @@ class VGGUNetDecoder(nn.Module):
                                         kernel_size=3, 
                                         stride=1, 
                                         padding=1,
-                                        num_blocks = 1 if idx==0 and max_channels==512 else 2,
+                                        num_blocks = 1 if idx==0 and max_channels==512 else 3,
                                         dropout_p = dropout_p if dropout_min_channels <= channels[idx+1] else 0.) \
                                     for idx in range(len(channels)-1)])
         
@@ -83,7 +91,7 @@ class VGGUNetDecoder(nn.Module):
                                                 if idx!=0 else None
                                     for idx in range(len(channels)-1)])
 
-        self.final_conv = DeconvNormActivation(channels[-1], 1, 1, 1, padding=0, dropout_p=0., bias=True, num_blocks=1)
+        self.final_conv = DeconvNormActivation(channels[-1], num_classes, 1, 1, padding=0, dropout_p=0., bias=True, num_blocks=1)
         self.channels = channels
         self.upsample = upsample
     
@@ -91,10 +99,14 @@ class VGGUNetDecoder(nn.Module):
         
         encoder_concat_index = 0
         
+        deep_supervision_features = []
         for index, (block1, block2) in \
             enumerate(zip(self.channel_blocks, self.conv_blocks)):
             
             if self.upsample[index]:
+            
+                deep_supervision_features.append(x)
+                
                 x = F.interpolate(x, scale_factor=2)   
                 x = torch.cat((encoder_tensors[encoder_concat_index], x), dim=1)
                 encoder_concat_index += 1
@@ -103,8 +115,8 @@ class VGGUNetDecoder(nn.Module):
             
             if not block2 is None:
                 x = block2(x)
-            
-        return self.final_conv(x)
+
+        return self.final_conv(x), deep_supervision_features
 
 class VGGUNetEncoder(nn.Module):
     
@@ -164,14 +176,21 @@ class VGGUNetEncoder(nn.Module):
 
 class VGGUNet(nn.Module):
     
-    def __init__(self, vgg_classifier, img_size=256, max_channels=512, dropout_p=0.05, dropout_min_channels=256):
+    def __init__(self, vgg_classifier, img_size=256, max_channels=512, num_classes=1, dropout_p=0.05, dropout_min_channels=256, deepsupervision=False):
       
         super().__init__()
+        
+        self.deepsupervision = deepsupervision
 
         self.encoder = VGGUNetEncoder(vgg_classifier, img_size, max_channels, dropout_p, dropout_min_channels)
-        self.decoder = VGGUNetDecoder(max_channels=max_channels, dropout_p=dropout_p, dropout_min_channels=dropout_min_channels)
+        self.decoder = VGGUNetDecoder(num_classes=1, max_channels=max_channels, dropout_p=dropout_p, dropout_min_channels=dropout_min_channels)
         
         self.dropout_p, self.dropout_min_channels = dropout_p, dropout_min_channels
+
+        if deepsupervision:
+            self.convs = nn.ModuleList()
+            for inchannels in [512, 512, 512, 256, 128]:
+                self.convs.append(nn.Conv2d(inchannels, num_classes, kernel_size=3, stride=1, padding=1, bias=True)) 
 
     def __str__(self):
 
@@ -180,12 +199,22 @@ class VGGUNet(nn.Module):
     def forward(self, x):
         
         x, encoder_tensors = self.encoder.forward(x)
-        x = self.decoder.forward(x, encoder_tensors)
 
-        return x
+        if self.deepsupervision:
+            x, decoder_tensors = self.decoder.forward(x, encoder_tensors)
+            
+            out = []
+            for tensor, conv in zip(decoder_tensors, self.convs):
+                out.append(conv(tensor))
+            
+            return x, list(reversed(out)) 
+        else:
+            return x
 
 if __name__ == "__main__":
     
+    import numpy as np
+
     net = vgg19_bn()
 
 #    net = nn.Sequential(vgg19_bn().features)
@@ -198,6 +227,9 @@ if __name__ == "__main__":
 #    decoder = VGGUNetDecoder()
 #    print (summary(decoder, (512, 8, 8)))
     
-    net = VGGUNet(net, max_channels=64, dropout_p=0.05, dropout_min_channels=256)
-    net=  net.cuda()
+    net = VGGUNet(net, max_channels=512, dropout_p=0.05, dropout_min_channels=256, deepsupervision=True)
+    #net=  net.cuda()
+    x = torch.ones((1,3,256,256))
+    out, smallerouts = net(x)
+    print (out.shape, [x.shape for x in smallerouts])
     print (summary(net, (3,256,256)))

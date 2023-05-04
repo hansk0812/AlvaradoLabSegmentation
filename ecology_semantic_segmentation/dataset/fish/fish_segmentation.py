@@ -12,7 +12,7 @@ from torch.utils.data import Dataset
 from . import composite_labels
 
 from ..augment import augment_fn
-from ..bbox_masks_problem import remove_islands_in_segment_gt
+#from ..bbox_masks_problem import remove_islands_in_segment_gt
 
 def imread(file_path):
     
@@ -25,7 +25,7 @@ def imread(file_path):
 
 class SegmentationDataset(Dataset):
 
-    def __init__(self, segmentation_data, img_shape, min_segment_positivity_ratio, sample_dataset = True, organs=None): 
+    def __init__(self, segmentation_data, img_shape, min_segment_positivity_ratio, sample_dataset = True, organs=None, augment_flag=False): 
         
 #        if sample_dataset:
 #            segmentation_data = {key: segmentation_data[key] for key in list(segmentation_data)[:60]}
@@ -64,7 +64,7 @@ class SegmentationDataset(Dataset):
         else:
             self.label_indices = list(range(len(composite_labels)))
 
-        self.set_augment_flag(True)
+        self.set_augment_flag(augment_flag)
 
     def __len__(self):
         return len(self.segmentation_keys)
@@ -95,15 +95,15 @@ class SegmentationDataset(Dataset):
             try:
                 organ = composite_labels[organ_index]
                 segment = imread(segments_paths[organ])
-            
+
                 segment = cv2.resize(segment, (self.img_shape, self.img_shape))
 
                 segment = cv2.cvtColor(segment, cv2.COLOR_BGR2GRAY)
                 
                 segment = cv2.bitwise_not(segment)
-                segment[segment>0] = 1
+                segment[segment>0] = 255
                 
-                segment = remove_islands_in_segment_gt(segment)
+                #segment = remove_islands_in_segment_gt(segment)
                 
                 # Decide using this image: Machine learning training set (copy)/photos 1.30.2019/original image/f132C.png
                 #SEGMENT_THRESHOLD = 225
@@ -125,9 +125,10 @@ class SegmentationDataset(Dataset):
         if self.augment_flag:
             image, segment_array = augment_fn(image, segment_array)
         
-        return image.transpose((2,0,1)).astype(np.float32), segment_array.transpose((2,0,1)).astype(np.float32), image_path
+        return image.transpose((2,0,1)).astype(np.float32) / 255.0, segment_array.transpose((2,0,1)).astype(np.float32) / 255.0, image_path
 
-def get_ml_training_set_data(dtype, path, folder_path, img_shape, min_segment_positivity_ratio, sample_dataset=True, organs=None):
+def get_ml_training_set_data(dtype, path, folder_path, img_shape, min_segment_positivity_ratio, 
+                                sample_dataset=True, organs=None, bbox_dir=None ,augment_flag = True):
     
     #TODO: 9 missing images from dataset!
 
@@ -138,13 +139,17 @@ def get_ml_training_set_data(dtype, path, folder_path, img_shape, min_segment_po
     folders = [x for x in glob.glob(os.path.join(folder_path, path, "*")) \
                 if os.path.isdir(x)]
     
+    if not bbox_dir is None:
+        folders.append(os.path.join(folder_path, bbox_dir))
+        folders = list(reversed(folders))
+
     data = {}
     for directory in folders:
         
         dir_folders = glob.glob(os.path.join(directory, "*"))
         
         images = glob.glob(os.path.join(directory, 'original image/*'))
-        
+
         if sample_dataset:
             images = images[:20]
 
@@ -171,7 +176,7 @@ def get_ml_training_set_data(dtype, path, folder_path, img_shape, min_segment_po
 
                 if len(ann_paths) == 1:
                     if os.path.exists(ann_paths[0]):
-                        segment_paths[organ] = ann_paths[0]  
+                        segment_paths[organ] = ann_paths[0]
             
             if len(segment_paths) > 0:
 
@@ -185,16 +190,22 @@ def get_ml_training_set_data(dtype, path, folder_path, img_shape, min_segment_po
                 except Exception:
                     pass
 
-    dataset = SegmentationDataset(data, img_shape, min_segment_positivity_ratio, sample_dataset=sample_dataset, organs=organs)
+    dataset = SegmentationDataset(data, img_shape, min_segment_positivity_ratio, sample_dataset=sample_dataset, organs=organs, augment_flag=augment_flag)
     print ("Using %d labeled images from dataset: %s!" % (len(dataset), "Segmentation dataset: %s" % path))
     
     return dataset
 
 if __name__ == "__main__":
-
-    data_dir = os.path.join(os.path.abspath("."), 'ecology_semantic_segmentation', 'dataset')
     
-    dset = get_ml_training_set_data(dtype="segmentation/composite", path="gray", folder_path=data_dir, img_shape=256, min_segment_positivity_ratio=0.05, sample_dataset=False, organs=["whole_body"])
+    data_dir = "/home/hans/data/"
+    
+    dset = get_ml_training_set_data(dtype="segmentation/composite", path="Machine learning training set/", folder_path=data_dir, 
+            img_shape=256, min_segment_positivity_ratio=0.05, sample_dataset=False, organs=None)#, bbox_dir="bbox_dependent_images_path")
 
     for img, seg, fpath in dset:
+        print (img.min(), img.max())
+        cv2.imshow('f', img.transpose((1,2,0)))
+        cv2.imshow('g', seg[0])
+        cv2.waitKey()
+
         print (img.shape, seg.shape, fpath)
