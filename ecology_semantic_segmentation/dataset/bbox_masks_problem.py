@@ -56,7 +56,7 @@ if __name__ == "__main__":
     from .fish import fish_train_dataset, fish_val_dataset, fish_test_dataset
     
     # Display all files that need to be moved to new dataset folder
-    for img, ann, fname in fish_train_dataset:
+    for img, ann, fname in fish_test_dataset:
 
         ann[ann>0] = 1
         ann = ann[0]

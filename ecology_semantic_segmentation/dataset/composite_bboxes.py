@@ -27,7 +27,6 @@ BBOX_ANNOTATION_FILES = [
     "12-23-2019/original image/f156B.jpg",
     "12-23-2019/original image/f1B.png",
     "12-23-2019/original image/f22B.jpg",
-    "12-23-2019/original image/f172B",
     "12-23-2019/original image/f132B.jpg",
     "12-23-2019/original image/f125B.jpg",
     "photos 1.30.2019/original image/f14aB.jpg",
@@ -229,7 +228,8 @@ BBOX_ANNOTATION_FILES = [
     "photos 1.30.2019/original image/f5C.jpg",
     "photos 1.30.2019/original image/f7C.jpg",
     "photos 1.30.2019/original image/f74C.jpg",
-    "12-23-2019/original image/f57B.jpg",
     "12-23-2019/original image/f54C.jpg",
+    "12-23-2019/original image/f60C.jpg",
+    "12-23-2019/original image/f64C.jpg",
 ]
 
