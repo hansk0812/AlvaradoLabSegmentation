@@ -72,6 +72,7 @@ def test(net, dataloader, num_epochs=100, log_every=100, batch_size=8, models_di
                 cv2.imwrite(img_file, image)
                 cv2.imwrite(gt_file, test_labels)
                 cv2.imwrite(pred_file, test_outputs)
+                print (img_file, pred_file)
         
         dice_loss_val = test_dice[0] / float(test_dice[1])
         print ("Epoch %d: \n\t Test Dice Score: %.5f" % (
