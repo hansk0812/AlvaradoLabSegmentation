@@ -33,7 +33,7 @@ from torch.utils.data import DataLoader
 
 torchcpu_to_opencv = lambda img: (img.numpy().transpose((1,2,0))*255).astype(np.uint8)
 
-def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, start_epoch, num_epochs=2000, log_every=100):
+def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, start_epoch, num_epochs=5000, log_every=100):
     
     if not os.path.isdir("val_images"):
         os.mkdir("val_images")
@@ -82,7 +82,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                 bce_l = binary_cross_entropy_list(labels, outputs)
             else:
                 bce_l = cross_entropy_loss(labels, outputs, bce=True)
-            loss =  bce_l + fl_l + dice #+ twersky_dice #bce_l #ce_l + fl_l + sum(dice_l)
+            loss =  dice + generalized_dice + twersky_dice #+ twersky_dice #bce_l #ce_l + fl_l + sum(dice_l)
             loss.backward()
             optimizer.step()
 
@@ -142,7 +142,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                 #dice_t = [x.item() + y for (x,y) in zip(dice_l, dice_t)]
                 
                 # save 5 images per epoch for testing
-                if j < 5:
+                if j < 10:
                     
                     if not os.path.isdir(os.path.join("val_images", str(epoch))):
                         os.mkdir(os.path.join("val_images", str(epoch)))
@@ -247,7 +247,7 @@ if __name__ == "__main__":
     if torch.cuda.is_available():
         vgg_unet = vgg_unet.cuda()
     
-    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.001)
+    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.0001)
     #optimizer = optim.SGD(vgg_unet.parameters(), lr=0.00001, momentum=0.9)
     
     train(vgg_unet, train_dataloader, val_dataloader, losses_fn, optimizer, save_dir=saved_dir, start_epoch=start_epoch, 
