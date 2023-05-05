@@ -26,7 +26,7 @@ def remove_islands_in_segment_gt(mask):
     return mask
 
 def shoelace_algorithm(contour):
-
+    
     N = len(contour)
     area = 0
     for idx, jdx in zip(range(N-1), range(1, N)):

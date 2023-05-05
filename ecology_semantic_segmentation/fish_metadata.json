@@ -10,7 +10,7 @@
 	 "type": "polygons"
 	},
 	
-	{"folder": "DeepFish/",
+	{"folder": "Deep Fish/",
 	 "name": "deepfish_segclsloc",
 	 "type": "segmentation"
 	},
@@ -31,7 +31,7 @@
 	},
 	
 	{"folder": "pawsey/",
-	 "name": "deepfish",
+	 "name": "pawsey",
 	 "type": "polygons"
 	},
 

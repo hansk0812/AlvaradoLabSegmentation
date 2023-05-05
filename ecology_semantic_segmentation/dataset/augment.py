@@ -26,8 +26,8 @@ def augment_fn(image, masks, img_size=256):
                                 Emboss(alpha=(0.3, 0.6), strength=(0.3, 0.7), p=0.3),
                             ], p=0.4),
                          A.RandomResizedCrop(img_size, img_size, p=0.7),
-                         A.CropAndPad(percent=[60, 40]),
-                         FDA([target_image], p=0.2, read_fn=lambda x: x),
+                         #A.CropAndPad(percent=[30, 20]), # makes it too slow
+                         #FDA([target_image], p=0.2, read_fn=lambda x: x), # makes it too slow
 #                        A.OneOf([
 #                            A.RandomCrop(width=128, height=128, p=0.5),
 #                            A.RandomCrop(width=64, height=64, p=0.5),
@@ -51,6 +51,8 @@ def augment_fn(image, masks, img_size=256):
     if np.random.rand() < 0.4:
         image, masks = Arotate(image, masks, p=1)
     
+    del target_image
+
     return image, masks
 
 def Arotate(image, masks, degree=None, p=0.5):
