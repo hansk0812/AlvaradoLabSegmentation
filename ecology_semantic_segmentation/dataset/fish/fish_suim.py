@@ -123,7 +123,9 @@ if __name__ == "__main__":
     
     data_dir = "/home/hans/data/"
     dataset_dir = "SUIM/SUIM/train_val/" 
-
+    
+    print ("dtype=\"segmentation\"", "path=", dataset_dir, "folder_path=", data_dir, 
+            "img_shape=256", "min_segment_positivity_ratio=0.05", "sample_dataset=True", "organs=[\"whole_body\"]")
     dset = get_suim_data(dtype="segmentation", path=dataset_dir, folder_path=data_dir, 
             img_shape=256, min_segment_positivity_ratio=0.05, sample_dataset=True, organs=["whole_body"])
 

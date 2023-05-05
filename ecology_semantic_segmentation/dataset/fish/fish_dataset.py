@@ -19,6 +19,8 @@ from .. import datasets_metadata
 # All datasets have get_%s_data
 from .fish_coco_annotator import get_alvaradolab_data
 from .fish_segmentation import get_ml_training_set_data
+from .fish_suim import get_suim_data
+from .fish_deepfish_segment import get_deepfish_segclsloc_data
 
 import traceback
 
@@ -26,13 +28,13 @@ import traceback
 
 class FishDataset(Dataset):
 
-    def __init__(self, dataset_type="segmentation", img_shape = 256, min_segment_positivity_ratio=0.0075, 
+    def __init__(self, dataset_type=["segmentation/composite"], img_shape = 256, min_segment_positivity_ratio=0.0075, 
                  organs=["whole_body"], sample_dataset=True, deepsupervision=False): 
         # min_segment_positivity_ratio is around 0.009 - 0.011 for eye (the smallest part)
         
         global composite_labels
 
-        assert dataset_type in DATASET_TYPES
+        assert all([x in DATASET_TYPES for x in dataset_type]), ",".join([x + str(x in DATASET_TYPES) for x in dataset_type])
         
         self.folder_path = datasets_metadata["folder_path"] 
         datasets = datasets_metadata["datasets"] 
@@ -41,13 +43,15 @@ class FishDataset(Dataset):
         self.xy_pairs = []
 
         # Accepts single type of data only
-        datasets = reversed(list(reversed([x for x in datasets if x["type"] == dataset_type])))
+        datasets = reversed(list(reversed([x for x in datasets if x["type"] in dataset_type])))
         
         self.curated_images_count, self.dataset_generators = 0, []
         
         self.get_alvaradolab_data = get_alvaradolab_data
         self.get_ml_training_set_data = get_ml_training_set_data
-        
+        self.get_suim_data = get_suim_data
+        self.get_deepfish_segclsloc_data = get_deepfish_segclsloc_data
+
         self.datasets, self.dataset_cumsum_lengths = [], []
         self.val_datasets, self.test_datasets = [], []
 
@@ -180,7 +184,7 @@ if __name__ == "__main__":
     ap.add_argument("--sample_dataset", action="store_true", help="Boolean to sample dataset instead of use all data")
     args = ap.parse_args()
 
-    dataset = FishDataset(dataset_type="segmentation/composite", sample_dataset=args.sample_dataset) 
+    dataset = FishDataset(dataset_type=["segmentation", "segmentation/composite"], sample_dataset=args.sample_dataset) 
     print ("train dataset: %d images" % len(dataset))
 
        
