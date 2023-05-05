@@ -11,7 +11,7 @@ import numpy as np
 # slightly slower than MSE - able to achieve results with MSE
 #from skimage.metrics import structural_similarity as ssim
 
-from .composite_bboxes import BBOX_ANNOTATION_FILES
+from .resources.composite_bboxes import BBOX_ANNOTATION_FILES
 
 def return_bbox_corrected_annotations(imgpath, maskpath):
     img_np, mask_np = cv2.imread(imgpath), cv2.imread(maskpath)

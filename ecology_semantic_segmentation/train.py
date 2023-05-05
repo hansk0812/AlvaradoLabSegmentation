@@ -10,6 +10,7 @@ try:
 except Exception:
     MAXCHANNELS = 256
 
+EXPT_NAME = "unet_resnet50"
 
 import glob
 import traceback
@@ -79,7 +80,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
 
             #loss =  dice + generalized_dice + twersky_dice + focal_dice
             #loss = dice + generalized_dice + twersky_dice + bce_l
-            loss =  bce_l #ce_l + fl_l + sum(dice_l)
+            loss =  dice + generalized_dice + twersky_dice #ce_l + fl_l + sum(dice_l)
             loss.backward()
             optimizer.step()
 
@@ -98,7 +99,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                 
                 if epoch % 10 == 0:
                     torch.save(net.state_dict(), os.path.join(save_dir, "channels%d" % MAXCHANNELS, 
-                                "img%d" % IMGSIZE,"%s_epoch%d.pt" % ("vgg_unet", epoch)))
+                                "img%d" % IMGSIZE,"%s_epoch%d.pt" % (EXPT_NAME, epoch)))
 
                 print("Epoch: %d ; Batch: %d/%d : Training Loss: %.8f" % (epoch+1, i+1, len(traindataloader), running_loss / log_every))
                 print ("\t Cross-Entropy: %0.8f; BCE: %.8f; Focal Loss: %0.8f; Dice Loss: %0.8f [D: %.8f, GD: %.8f, TwD: %.8f, FocD: %.8f]" % (
@@ -131,7 +132,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                 #ce_l, bce_l, fl_l, dice, generalized_dice, twersky_dice, focal_dice = losses_fn(val_outputs, val_labels)
                 
                 #dice_l = [dice, generalized_dice, twersky_dice, focal_dice]
-                val_loss = bce_l + fl_l #generalized_dice #ce_l + fl_l + sum(dice_l)
+                val_loss = bce_l + dice #generalized_dice #ce_l + fl_l + sum(dice_l)
                 val_running_loss += val_loss.item()
                 #ce_t += ce_l.item()
                 bce_t += bce_l.item()
@@ -174,9 +175,9 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
         scheduler.step(val_running_loss)
 
         print("\nVal Loss: %.8f!" % val_running_loss)
-        print ("\t Cross-Entropy: %0.8f; BCE: %.8f; Focal Loss: %0.8f; Dice Loss: %0.8f [D: %.8f, GD: %.8f, TwD: %.8f, FocD: %.8f]" % (
-                    ce_t/float(num_avg), bce_t/float(num_avg), fl_t/float(num_avg), sum([x/float(num_avg) for x in dice_t]), 
-                    dice_t[0]/float(num_avg), dice_t[1]/float(num_avg), dice_t[2]/float(num_avg), dice_t[3]/float(num_avg)))
+#        print ("\t Cross-Entropy: %0.8f; BCE: %.8f; Focal Loss: %0.8f; Dice Loss: %0.8f [D: %.8f, GD: %.8f, TwD: %.8f, FocD: %.8f]" % (
+#                    ce_t/float(num_avg), bce_t/float(num_avg), fl_t/float(num_avg), sum([x/float(num_avg) for x in dice_t]), 
+#                    dice_t[0]/float(num_avg), dice_t[1]/float(num_avg), dice_t[2]/float(num_avg), dice_t[3]/float(num_avg)))
 
     print('finished training')
 
@@ -186,8 +187,8 @@ def losses_fn(x, g):
         ce_loss, fl_loss = cross_entropy_list(x, g), focal_list(x, g, factor=1e-5)
         dice, generalized_dice, twersky_dice, focal_dice = classification_dice_list(x, g, factor=10)
     else: 
-        bce_loss = cross_entropy_loss(x, g)
-        ce_loss, fl_loss = cross_entropy_loss(x, g, bce=None), focal_loss(x, g, factor=1)
+        bce_loss = cross_entropy_loss(x, g, bce=True)
+        ce_loss, fl_loss = cross_entropy_loss(x, g, bce=False), focal_loss(x, g, factor=1)
         dice, generalized_dice, twersky_dice, focal_dice = classification_dice_loss(x, g, factor=10)
     
     return ce_loss, bce_loss, fl_loss, dice, generalized_dice, twersky_dice, focal_dice
@@ -196,7 +197,7 @@ def load_recent_model(saved_dir, net):
     
     try:
         gl = glob.glob(os.path.join(saved_dir, "channels%d" % MAXCHANNELS, 
-                            "img%d" % IMGSIZE, "vgg_unet*")) 
+                            "img%d" % IMGSIZE, "%s*"%EXPT_NAME)) 
         index = np.argmax([int(x.split("epoch")[-1].split('.')[0]) for x in gl]) 
         model_file = gl[index]
 
@@ -216,7 +217,7 @@ if __name__ == "__main__":
     
     import segmentation_models_pytorch as smp
     vgg_unet = smp.Unet(
-                encoder_name="resnet34",        # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
+                encoder_name="resnet50",        # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
                 encoder_weights="imagenet",     # use `imagenet` pre-trained weights for encoder initialization
                 in_channels=3,                  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
                 classes=1,                      # model output channels (number of classes in your dataset)
@@ -234,7 +235,7 @@ if __name__ == "__main__":
                                     worker_init_fn=lambda _: np.random.seed(random.randint(0, 2**32 - 1)))
     val_dataloader = DataLoader(fish_val_dataset, shuffle=False, batch_size=1, num_workers=1)
     
-    model_dir = "vgg/"
+    model_dir = EXPT_NAME + "/"
     saved_dir = "models/"+model_dir
     if not os.path.isdir(saved_dir):
         os.makedirs(saved_dir)
