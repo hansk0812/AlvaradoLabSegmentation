@@ -17,7 +17,7 @@ except Exception:
     IMG_SIZE = 256
 deepsupervision = False
 
-fish_train_dataset = FishDataset(dataset_type=["segmentation", "segmentation/composite"], 
+fish_train_dataset = FishDataset(dataset_type=["segmentation/composite", "segmentation"], 
                                  img_shape=IMG_SIZE, 
                                  sample_dataset=SAMPLE_DATASET,
                                  deepsupervision=deepsupervision)
