@@ -40,7 +40,7 @@
 	 "type": "polygons"
 	},
 
-	{"folder": "SUIM/SUIM/",
+	{"folder": "SUIM/SUIM/train_val",
 	 "name": "suim",
 	 "type": "segmentation"
 	},

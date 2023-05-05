@@ -82,7 +82,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                 bce_l = binary_cross_entropy_list(labels, outputs)
             else:
                 bce_l = cross_entropy_loss(labels, outputs, bce=True)
-            loss =  dice + generalized_dice + twersky_dice #+ twersky_dice #bce_l #ce_l + fl_l + sum(dice_l)
+            #loss = dice + generalized_dice + twersky_dice + bce_l
+            loss =  bce_l + generalized_dice + dice + twersky_dice #bce_l #ce_l + fl_l + sum(dice_l)
             loss.backward()
             optimizer.step()
 
@@ -190,7 +191,7 @@ def losses_fn(x, g):
         dice, generalized_dice, twersky_dice, focal_dice = classification_dice_list(x, g, factor=10)
     else: 
         bce_loss = cross_entropy_loss(x, g)
-        ce_loss, fl_loss = cross_entropy_loss(x, g, bce=None), focal_loss(x, g)
+        ce_loss, fl_loss = cross_entropy_loss(x, g, bce=None), focal_loss(x, g, factor=1)
         dice, generalized_dice, twersky_dice, focal_dice = classification_dice_loss(x, g, factor=10)
     
     return ce_loss, bce_loss, fl_loss, dice, generalized_dice, twersky_dice, focal_dice

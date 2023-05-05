@@ -76,13 +76,11 @@ def twersky_loss(gt, pred, alpha=0.5, beta=0.3):
 
 def focal_dice_coefficient(gt, pred, alpha=0.5, beta=0.3, gamma=1.8):
 
-    fdsc_n = 2 * torch.sum(gt * torch.pow(1-pred, gamma) * pred) 
-    fdsc_d = torch.sum(gt * torch.pow(1-pred, gamma) * pred) + \
-             torch.sum((1-gt) * torch.pow(1-pred, alpha) * pred) + \
-             torch.sum((1-pred) * torch.pow(pred, alpha) * gt)
+    dl_n = 2 * torch.sum(gt * pred)
+    dl_d = torch.sum(gt * gt + pred * pred)
 
-    return - (fdsc_n + 1e-7) / (fdsc_d + 1e-7)
-
+    dice_coeff = (dl_n + 1e-7) / (dl_d + 1e-7)
+    return - torch.pow(1-dice_coeff, gamma) * torch.log(dice_coeff + 1e-7)
 
 def classification_dice_loss(gt, pred, factor=1e3):
     
