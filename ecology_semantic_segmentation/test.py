@@ -1,20 +1,19 @@
 # Testing
-
-from .dataset.fish import fish_test_dataset
-from .model import vgg_unet
-
-import torch
-
-from torch.utils.data import DataLoader
-
-from .train import load_recent_model
-
-import csv
-
 import os
 import cv2
 
 import numpy as np
+
+import torch
+from torch.nn import functional as F
+
+from torch.utils.data import DataLoader
+
+from .dataset.fish import fish_test_dataset
+from .model import vgg_unet
+
+from .train import load_recent_model
+from .loss_functions import cross_entropy_loss, dice_loss
 
 def tensor_to_cv2(img_batch):
     img_batch = img_batch.numpy().transpose((0,2,3,1))
@@ -24,10 +23,12 @@ def tensor_to_cv2(img_batch):
 
     return img_batch
 
-def test(net, dataloader, num_epochs=100, log_every=100, batch_size=8, models_dir="models/scratch", results_dir="test_results/"):
+def test(net, dataloader, num_epochs=100, log_every=100, batch_size=8, models_dir="models/vgg", results_dir="test_results/"):
 
     saved_epoch = load_recent_model(models_dir, net)
- 
+    
+    test_loss = {"bce": [0, 0], "dice": [0, 0]}
+
     label_dirs = ["whole_body"]
     try:
         for label_dir in label_dirs:
@@ -35,7 +36,6 @@ def test(net, dataloader, num_epochs=100, log_every=100, batch_size=8, models_di
     except Exception:
         pass
     
-    results_csv = []
     with torch.no_grad():
         for j, test_images in enumerate(dataloader, 0):
 
@@ -46,40 +46,44 @@ def test(net, dataloader, num_epochs=100, log_every=100, batch_size=8, models_di
             if torch.cuda.is_available():
                 test_images = test_images.cuda()
             
-            test_outputs = net(test_images)
+            test_outputs = F.sigmoid(net(test_images))
             
+            test_loss["bce"] = [cross_entropy_loss(test_outputs, test_labels, bce=True), test_loss["bce"][1]+1]
+            test_loss["dice"] = [dice_loss(test_outputs, test_labels), test_loss["dice"][1]+1]
+
             if torch.cuda.is_available():
                 test_images = test_images.cpu()
                 test_outputs = test_outputs.cpu()
-
-            test_outputs = test_outputs.numpy()
-            test_labels = list(np.argmax(test_outputs, axis=-1)[:,0]) #.detach().numpy())
+            
+            test_outputs = test_outputs[0][0].round().detach().numpy()
+            test_labels = test_labels[0][0].detach().numpy()
             test_images = tensor_to_cv2(test_images) #.detach())
             
-            for idx, (image, label, img_id) in enumerate(zip(test_images, test_labels, image_ids)):
+            for idx, (image, label, pred) in enumerate(zip(test_images, test_labels, test_outputs)):
                 
-                label_prob = abs((1-label) - test_outputs[idx, 0, label])
-                try:
-                    label_dir = label_dirs[label_dirs.index(label)]
-                except Exception:
-                    continue
-                results_csv.append([img_id, label_prob])
+                label_dir = label_dirs[0]
+                
                 image = (image*255).astype(np.uint8)
-                
-                img_file = os.path.join(results_dir, "%s"%str(saved_epoch).zfill(4), label_dir, "%s.png"% str(j*batch_size + idx).zfill(5)) 
-                cv2.imwrite(img_file, image)
-        
-        print ()
-        with open(os.path.join(results_dir, "%s.csv"%str(saved_epoch).zfill(4)), 'w', newline='') as f:
-            W = csv.writer(f, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-            for result in results_csv:
-                W.writerow(result)
+                test_labels = (test_labels*255).astype(np.uint8)
+                test_outputs = (test_outputs*255).astype(np.uint8)
 
+                img_file = os.path.join(results_dir, "%s"%str(saved_epoch).zfill(4), label_dir, "%s_img.png"% str(j*batch_size + idx).zfill(5))
+                gt_file = os.path.join(results_dir, "%s"%str(saved_epoch).zfill(4), label_dir, "%s_gt.png"% str(j*batch_size + idx).zfill(5))
+                pred_file = os.path.join(results_dir, "%s"%str(saved_epoch).zfill(4), label_dir, "%s_pred.png"% str(j*batch_size + idx).zfill(5))
+                cv2.imwrite(img_file, image)
+                cv2.imwrite(gt_file, test_labels)
+                cv2.imwrite(pred_file, test_outputs)
+        
+        print ("Test Loss: \n\tBCE Loss: %.5f; Dice Loss: %.5f" % (
+                test_loss["bce"][0] / float(test_loss["bce"][1]),
+                test_loss["dice"][0] / float(test_loss["dice"][1]),
+            ))
         print('Finished Testing')
 
 if __name__ == "__main__":
 
-    batch_size = 8
+    batch_size = 1
+    [x.dataset.set_augment_flag(False) for x in fish_test_dataset.datasets]
     test_dataloader = DataLoader(fish_test_dataset, shuffle=False, batch_size=batch_size, num_workers=0)
  
     import segmentation_models_pytorch as smp
@@ -91,9 +95,12 @@ if __name__ == "__main__":
             )
 
 
-    net = vgg_unet.cuda()
+    if torch.cuda.is_available():
+        net = vgg_unet.cuda()
+    else:
+        net = vgg_unet
 
     print ("Using batch size: %d" % batch_size)
 
     with torch.no_grad():
-        test(net, test_dataloader, models_dir="models/vgg", batch_size=batch_size)
+        test(net, test_dataloader, models_dir="models/vgg/", batch_size=batch_size)

@@ -78,12 +78,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             dice_l = [dice, generalized_dice, twersky_dice, focal_dice]
 
             #loss =  dice + generalized_dice + twersky_dice + focal_dice
-            if isinstance(outputs, list):
-                bce_l = binary_cross_entropy_list(labels, outputs)
-            else:
-                bce_l = cross_entropy_loss(labels, outputs, bce=True)
             #loss = dice + generalized_dice + twersky_dice + bce_l
-            loss =  bce_l + generalized_dice + dice + twersky_dice #bce_l #ce_l + fl_l + sum(dice_l)
+            loss =  bce_l #ce_l + fl_l + sum(dice_l)
             loss.backward()
             optimizer.step()
 
@@ -248,7 +244,7 @@ if __name__ == "__main__":
     if torch.cuda.is_available():
         vgg_unet = vgg_unet.cuda()
     
-    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.0001)
+    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.001)
     #optimizer = optim.SGD(vgg_unet.parameters(), lr=0.00001, momentum=0.9)
     
     train(vgg_unet, train_dataloader, val_dataloader, losses_fn, optimizer, save_dir=saved_dir, start_epoch=start_epoch, 
