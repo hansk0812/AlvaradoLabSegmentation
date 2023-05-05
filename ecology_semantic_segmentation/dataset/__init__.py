@@ -1,4 +1,4 @@
-from .color_constants import colors
+from .resources.color_constants import colors
 from random import shuffle
 colors = {k: colors[k] for k in colors if \
                 any([x in colors for x in ["blue", "red", "cyan", "yellow", "green"]]) and \

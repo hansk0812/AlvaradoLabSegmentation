@@ -66,13 +66,22 @@ def test(net, dataloader, num_epochs=100, log_every=100, batch_size=8, models_di
                 test_labels = (test_labels*255).astype(np.uint8)
                 test_outputs = (test_outputs*255).astype(np.uint8)
 
-                img_file = os.path.join(results_dir, "%s"%str(saved_epoch).zfill(4), label_dir, "%s_img.png"% str(j*batch_size + idx).zfill(5))
-                gt_file = os.path.join(results_dir, "%s"%str(saved_epoch).zfill(4), label_dir, "%s_gt.png"% str(j*batch_size + idx).zfill(5))
-                pred_file = os.path.join(results_dir, "%s"%str(saved_epoch).zfill(4), label_dir, "%s_pred.png"% str(j*batch_size + idx).zfill(5))
+                img_file = os.path.join(results_dir, "%s"%str(saved_epoch).zfill(4), label_dir, "%s.png"% str(j*batch_size + idx).zfill(5))
+                
+                test_outputs = np.dstack((np.zeros_like(test_outputs), np.zeros_like(test_outputs), test_outputs))
+                image1 = cv2.addWeighted(image, 0.6, test_outputs, 0.4, 0)
+
+                test_labels = np.dstack((np.zeros_like(test_labels), test_labels, np.zeros_like(test_labels)))
+                image2 = cv2.addWeighted(image, 0.6, test_labels, 0.4, 0)
+
+                image3 = cv2.addWeighted(image, 0.2, image2, 0.8, 0)
+                image3 = cv2.addWeighted(image3, 0.2, image1, 0.8, 0)
+                
+                image1 = cv2.putText(image1, 'Predictions', (30,50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 1, cv2.LINE_AA)
+                image2 = cv2.putText(image2, 'Ground Truth', (30,50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 1, cv2.LINE_AA)
+                
+                image = np.concatenate((image1, image2, image3), axis=0)
                 cv2.imwrite(img_file, image)
-                cv2.imwrite(gt_file, test_labels)
-                cv2.imwrite(pred_file, test_outputs)
-                print (img_file, pred_file)
         
         dice_loss_val = test_dice[0] / float(test_dice[1])
         print ("Epoch %d: \n\t Test Dice Score: %.5f" % (
@@ -92,7 +101,7 @@ if __name__ == "__main__":
     if args.single_model:
         batch_size = 1
     else:
-        batch_size = 8
+        batch_size = 1
     
     [x.dataset.set_augment_flag(False) for x in fish_test_dataset.datasets]
     test_dataloader = DataLoader(fish_test_dataset, shuffle=False, batch_size=batch_size, num_workers=0)
@@ -124,7 +133,10 @@ if __name__ == "__main__":
         test_model_files = [x for x in test_model_files if "epoch%d.pt"%saved_epoch in x]
 
     for model_file in test_model_files:
-        saved_epoch = int(model_file.split('epoch')[-1].split('.pt')[0])
+        try:
+            saved_epoch = int(model_file.split('epoch')[-1].split('.pt')[0])
+        except Exception:
+            continue
 
         if torch.cuda.is_available():
             net.load_state_dict(torch.load(model_file))
