@@ -43,7 +43,7 @@ class FishDataset(Dataset):
         self.xy_pairs = []
 
         # Accepts single type of data only
-        datasets = reversed(list(reversed([x for x in datasets if x["type"] in dataset_type])))
+        datasets = list([x for x in datasets if x["type"] in dataset_type])
         
         self.curated_images_count, self.dataset_generators = 0, []
         
@@ -72,7 +72,7 @@ class FishDataset(Dataset):
                                                         sample_dataset = sample_dataset,
                                                         bbox_dir = None, #bbox_dir)
                                                         augment_flag = True) 
-         
+                
                 # create train, val or test sets
                 num_samples = {"train": [0, int(len(dataset) * dataset_splits["train"])]}
                 num_samples["val"] = [num_samples["train"][1], num_samples["train"][1] + int(len(dataset) * dataset_splits["val"])] 
@@ -94,10 +94,6 @@ class FishDataset(Dataset):
             except Exception as e:
                 traceback.print_exc()
                 print ("Write generator function for dataset: %s ;" % dataset_method, e)
-        
-        self.datasets = list(reversed(self.datasets))
-        self.dataset_cumsum_lengths = [self.dataset_cumsum_lengths[idx] - self.dataset_cumsum_lengths[idx-1] \
-                                            for idx in range(len(self.dataset_cumsum_lengths)-1, 0, -1)] + [self.dataset_cumsum_lengths[-1]]
     
         self.deepsupervision = deepsupervision
 
@@ -126,6 +122,7 @@ class FishDataset(Dataset):
         current_dataset_id = 0
         while idx >= self.dataset_cumsum_lengths[current_dataset_id]:
             current_dataset_id += 1
+        
         dataset = self.datasets[current_dataset_id]
 
         data_index = idx if current_dataset_id == 0 else \
