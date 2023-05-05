@@ -18,16 +18,15 @@ from .loss_functions import cross_entropy_loss, dice_loss
 
 def tensor_to_cv2(img_batch):
     img_batch = img_batch.numpy().transpose((0,2,3,1))
-
-    for idx in range(img_batch.shape[0]):
-        img_batch[idx] = cv2.cvtColor(img_batch[idx], cv2.COLOR_RGB2BGR)
+    img_batch = img_batch[0]
+    
+    img_batch = cv2.cvtColor(img_batch, cv2.COLOR_RGB2BGR)
 
     return img_batch
 
 def test(net, dataloader, num_epochs=100, log_every=100, batch_size=8, models_dir="models/vgg", results_dir="test_results/", saved_epoch=-1):
     
-    test_loss = {"bce": [0, 0], "dice": [0, 0]}
-
+    test_dice = [0, 0]
     label_dirs = ["whole_body"]
     try:
         for label_dir in label_dirs:
@@ -44,20 +43,20 @@ def test(net, dataloader, num_epochs=100, log_every=100, batch_size=8, models_di
 
             if torch.cuda.is_available():
                 test_images = test_images.cuda()
+                test_labels = test_labels.cuda()
             
             test_outputs = F.sigmoid(net(test_images))
             
-            test_loss["bce"] = [cross_entropy_loss(test_outputs, test_labels, bce=True), test_loss["bce"][1]+1]
-
-            test_loss["dice"] = [dice_loss(test_outputs, test_labels), test_loss["dice"][1]+1]
+            test_dice = [test_dice[0] - dice_loss(test_outputs, test_labels), test_dice[1]+1]
 
             if torch.cuda.is_available():
                 test_images = test_images.cpu()
+                test_labels = test_labels.cpu()
                 test_outputs = test_outputs.cpu()
             
             test_outputs = test_outputs[0][0].round().detach().numpy()
             test_labels = test_labels[0][0].detach().numpy()
-            test_images = tensor_to_cv2(test_images) #.detach())
+            test_images = [tensor_to_cv2(test_images)] #.detach())
             
             for idx, (image, label, pred) in enumerate(zip(test_images, test_labels, test_outputs)):
                 
@@ -74,17 +73,26 @@ def test(net, dataloader, num_epochs=100, log_every=100, batch_size=8, models_di
                 cv2.imwrite(gt_file, test_labels)
                 cv2.imwrite(pred_file, test_outputs)
         
-        bce_loss_val = test_loss["bce"][0] / float(test_loss["bce"][1])
-        dice_loss_val = test_loss["dice"][0] / float(test_loss["dice"][1])
-        print ("Epoch %d Test Loss: \n\tBCE Loss: %.5f; Dice Loss: %.5f" % (
-            saved_epoch, bce_loss_val, dice_loss_val))
+        dice_loss_val = test_dice[0] / float(test_dice[1])
+        print ("Epoch %d: \n\t Test Dice Score: %.5f" % (
+            saved_epoch, dice_loss_val))
         print('Finished Testing')
 
-        return bce_loss_val, dice_loss_val
+        return dice_loss_val
 
 if __name__ == "__main__":
-
-    batch_size = 1
+    
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--single_model", action="store_true", help="Flag for model selection vs testing entire test set")
+    ap.add_argument("--models_dir", default="models/vgg", help="Flag for model selection vs testing entire test set")
+    args = ap.parse_args()
+    
+    if args.single_model:
+        batch_size = 1
+    else:
+        batch_size = 8
+    
     [x.dataset.set_augment_flag(False) for x in fish_test_dataset.datasets]
     test_dataloader = DataLoader(fish_test_dataset, shuffle=False, batch_size=batch_size, num_workers=0)
  
@@ -102,15 +110,19 @@ if __name__ == "__main__":
     else:
         net = vgg_unet
 
-    #saved_epoch = load_recent_model(models_dir, net)
     print ("Using batch size: %d" % batch_size)
-    models_dir = "models/vgg"
+    models_dir = args.models_dir
     channels=256
     img=256
 
     test_losses = []
-    for model_file in glob.glob(
-            os.path.join(models_dir, "channels%d" % channels, "img%d" % img,'*')):
+    test_model_files = glob.glob(
+            os.path.join(models_dir, "channels%d" % channels, "img%d" % img,'*'))
+    if args.single_model:
+        saved_epoch = load_recent_model(models_dir, net)
+        test_model_files = [x for x in test_model_files if "epoch%d.pt"%saved_epoch in x]
+
+    for model_file in test_model_files:
         saved_epoch = int(model_file.split('epoch')[-1].split('.pt')[0])
 
         if torch.cuda.is_available():
@@ -119,8 +131,8 @@ if __name__ == "__main__":
             net.load_state_dict(torch.load(model_file, map_location=torch.device("cpu")))
 
         with torch.no_grad():
-            bce_loss_val, dice_loss_val = test(net, test_dataloader, models_dir=models_dir, batch_size=batch_size, saved_epoch=saved_epoch)
-            test_losses.append([saved_epoch, bce_loss_val])
+            dice_loss_val = test(net, test_dataloader, models_dir=models_dir, batch_size=batch_size, saved_epoch=saved_epoch)
+            test_losses.append([saved_epoch, dice_loss_val])
 
     for loss in sorted(test_losses, key = lambda x: x[1]):
-        print ("Epoch %d : Loss %.10f" % (loss[0], loss[1]))
+        print ("Epoch %d : DICE Score %.10f" % (loss[0], loss[1]))
