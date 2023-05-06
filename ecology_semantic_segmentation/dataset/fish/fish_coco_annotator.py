@@ -67,6 +67,8 @@ class CocoSegmentationDataset(Dataset):
                     if not organs is None:
                         if not organ in organs:
                             continue
+                        if organ == "original_image":
+                            continue
                     composite_labels.append(organ)
 
                 area_of_poly = float(obj[idx+1])

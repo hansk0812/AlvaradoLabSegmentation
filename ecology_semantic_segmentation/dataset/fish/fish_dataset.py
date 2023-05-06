@@ -31,8 +31,6 @@ class FishDataset(Dataset):
     def __init__(self, dataset_type=["segmentation/composite"], img_shape = 256, min_segment_positivity_ratio=0.0075, 
                  organs=["whole_body"], sample_dataset=True, deepsupervision=False): 
         # min_segment_positivity_ratio is around 0.009 - 0.011 for eye (the smallest part)
-        
-        global composite_labels
 
         assert all([x in DATASET_TYPES for x in dataset_type]), ",".join([x + str(x in DATASET_TYPES) for x in dataset_type])
         
@@ -181,10 +179,9 @@ if __name__ == "__main__":
     ap.add_argument("--sample_dataset", action="store_true", help="Boolean to sample dataset instead of use all data")
     args = ap.parse_args()
 
-    dataset = FishDataset(dataset_type=["segmentation", "segmentation/composite"], sample_dataset=args.sample_dataset) 
+    dataset = FishDataset(dataset_type=["segmentation", "segmentation/composite"], sample_dataset=args.sample_dataset, organs=["whole_body", "head"]) 
     print ("train dataset: %d images" % len(dataset))
 
-       
     val_datasets, val_cumsum_lengths, \
     test_datasets, test_cumsum_lengths = dataset.return_val_test_datasets()
 

@@ -3,8 +3,6 @@ import numpy as np
 
 from torch.utils.data import Dataset
 
-from .fish import fish_train_dataset
-
 class SegmentColorDistribution(Dataset):
     
     BACKGROUND_CLASS = "background"
@@ -75,34 +73,17 @@ class SegmentColorDistribution(Dataset):
 
         means = [np.mean(x, axis=0) for x in color_ranges]
         for mean in means:
-            min_distance = min(min_distance, np.sum(np.abs(mean - pixel)))  
+            # Consider hue part of HSV image only for color determination
+            min_distance = min(min_distance, np.sum(np.abs(mean[0] - pixel[0])))  
         return min_distance
-
-        for color_range in color_ranges:
-            minrange, maxrange = color_range[0], color_range[1]
-            inrange = True
-            for imgch in range(3):
-                if not (pixel[imgch] > minrange[imgch] and pixel[imgch] < maxrange[imgch]):
-                    inrange = False
-            if inrange:
-                return True
-        return False
 
     def find_color_distribution(self, image, mask):
         
         mask = mask[:,:,0]
-        image[mask==0] = 0
         color_counts = [0 for _ in range(len(self.colors))]
         
-        """
-        for idx, color in enumerate(self.colors):
-            color_range = self.color_palette[self.colors.index(color)]["color_range"]
-            if not color_range is None:
-                for ranges in color_range:
-                    cv2.imshow(color, cv2.inRange(image, *ranges))
-                    cv2.waitKey()
-        exit()
-        """
+        multi_color_mask = np.zeros_like(image)
+
         color_counts = [0 for _ in range(len(self.colors))]
         indices = np.nonzero(mask)
         for mdx, ndx in zip(*indices):
@@ -112,30 +93,23 @@ class SegmentColorDistribution(Dataset):
                 if not color_range is None:
                     distances[idx] = min(distances[idx], self.pixel_inrange_boolean(image[mdx, ndx], color_range))
             color_counts[np.argmin(distances)] += 1
-            #print (self.colors[np.argmin(distances)], image[mdx, ndx])
-        print (sorted(zip(color_counts, self.colors), key = lambda x: x[0]))
-        """
-        indices = np.nonzero(mask)
-        for mdx, ndx in zip(*indices):
-            for idx, color in enumerate(self.colors):
-                color_range = self.color_palette[self.colors.index(color)]["color_range"]
-                if not color_range is None:
-                    if self.pixel_inrange_boolean(image[ndx, mdx], color_range):
-                        color_counts[idx] += 1
-                        print (mdx, ndx, color)
-                        break
-        """
-        print (color_counts)
+            target_color_range = self.color_palette[np.argmin(distances)]["color_range"][0]
+            multi_color_mask[mdx, ndx] = np.mean(target_color_range, axis=0).astype(np.uint8)
+        
+        for ctx, color in sorted(zip(color_counts, self.colors), key = lambda x: x[0]):
+            print (color, ctx)
+        print ('.'*50, "\n", '.'*50, "\n") 
+
         cv2.imshow('f', cv2.cvtColor(image, cv2.COLOR_HSV2BGR))
-        cv2.imshow('g', mask)
+        cv2.imshow('mask', multi_color_mask)
         cv2.waitKey()
 
 if __name__ == "__main__":
 
-    from .fish import fish_val_dataset
-    obj = SegmentColorDistribution(fish_val_dataset)
+    from .fish import fish_train_dataset
+    obj = SegmentColorDistribution(fish_train_dataset)
     
-    for img, mask, fname in fish_val_dataset:
+    for img, mask, fname in fish_train_dataset:
         img, mask = (img.transpose((1,2,0))*255).astype(np.uint8), (mask.transpose((1,2,0))).astype(np.uint8)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
         obj.find_color_distribution(img, mask)
