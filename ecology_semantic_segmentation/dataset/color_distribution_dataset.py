@@ -33,12 +33,14 @@ class SegmentColorDistribution(Dataset):
                 if color_range == "":
                     color_range = None
                 else:
-                    color_range = np.array([int(x) for x in color_range.split(',')]).reshape((2,3))
+                    color_range = np.array([int(x) for x in color_range.split(',')]).reshape((-1,3))
+                    color_range = [color_range[idx:idx+2] for idx in range(0, len(color_range), 2)]
                 self.color_palette.append({"color_name": color_name, "color_range": color_range})
             
             self.color_palette = sorted(self.color_palette, key = lambda x: x["color_name"])
             self.colors = [x["color_name"] for x in self.color_palette]
-
+            
+            print (self.colors)
             self.show_colors(self.colors)
 
     def show_colors(self, colors):
@@ -47,20 +49,17 @@ class SegmentColorDistribution(Dataset):
         
         return_image = cv2.cvtColor(self.palette_image, cv2.COLOR_BGR2HSV)
 
+        white_image = np.ones_like(self.palette_image)*255
         for idx, color in enumerate(colors):
             if self.color_palette[idx]["color_range"] is None:
                 continue
-            color_mask = cv2.inRange(return_image, *self.color_palette[idx]["color_range"]) 
-            color_mask[color_mask>0] = 1
-            black_image = np.ones_like(self.palette_image) * 255
-            black_image[:,:,0] = color_mask * self.palette_image[:,:,0]
-            black_image[:,:,1] = color_mask * self.palette_image[:,:,1]
-            black_image[:,:,2] = color_mask * self.palette_image[:,:,2]
+            for palette_range in self.color_palette[idx]["color_range"]:
+                color_mask = cv2.inRange(return_image, *palette_range) 
+                white_image[color_mask>0] = self.palette_image[color_mask>0]
             
-
-            cv2.imshow('f', self.palette_image)
-            cv2.imshow('g', black_image)
-            cv2.waitKey()
+        cv2.imshow('f', self.palette_image)
+        cv2.imshow('h', white_image)
+        cv2.waitKey()
 
 if __name__ == "__main__":
 
