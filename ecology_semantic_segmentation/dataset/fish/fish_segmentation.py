@@ -12,7 +12,7 @@ from torch.utils.data import Dataset
 from . import composite_labels
 
 from ..augment import augment_fn
-#from ..bbox_masks_problem import remove_islands_in_segment_gt
+#from ..utils.bbox_masks_problem import remove_islands_in_segment_gt
 
 def imread(file_path):
     
