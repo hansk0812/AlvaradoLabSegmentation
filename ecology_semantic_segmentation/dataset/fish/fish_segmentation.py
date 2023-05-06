@@ -24,15 +24,16 @@ def imread(file_path):
         return cv2.cvtColor(img, cv2.COLOR_RGB2BGR) 
 
 class SegmentationDataset(Dataset):
-
+    
+    composite_labels = composite_labels
     def __init__(self, segmentation_data, img_shape, min_segment_positivity_ratio, sample_dataset = True, organs=None, augment_flag=False): 
-        
+
 #        if sample_dataset:
 #            segmentation_data = {key: segmentation_data[key] for key in list(segmentation_data)[:60]}
         
         # Ensure all files contribute to data wrt organs
         if organs is None:
-            test_organs = composite_labels
+            test_organs = self.composite_labels
         else:
             test_organs = organs
 
@@ -60,9 +61,9 @@ class SegmentationDataset(Dataset):
         self.organs = organs
         
         if not organs is None:
-            self.label_indices = sorted([composite_labels.index(organ) for organ in organs])
+            self.label_indices = sorted([self.composite_labels.index(organ) for organ in organs])
         else:
-            self.label_indices = list(range(len(composite_labels)))
+            self.label_indices = list(range(len(self.composite_labels)))
 
         self.set_augment_flag(augment_flag)
 
@@ -87,14 +88,19 @@ class SegmentationDataset(Dataset):
         image = imread(image_path)
         image = cv2.resize(image, (self.img_shape, self.img_shape))
         
-        num_segments = len(composite_labels) if self.organs is None else len(self.organs)
+        num_segments = len(self.composite_labels) if self.organs is None else len(self.organs)
         segment_array = np.zeros((self.img_shape, self.img_shape, num_segments)) 
         
-        for organ_index in self.label_indices:
+        for label_index, organ_index in enumerate(self.label_indices):
             
             try:
-                organ = composite_labels[organ_index]
-                segment = imread(segments_paths[organ])
+                organ = self.composite_labels[organ_index]
+
+                try:
+                    segment = imread(segments_paths[organ])
+                except Exception:
+                    segment_array[:, :, label_index] = np.ones((self.img_shape, self.img_shape)) * -1 
+                    continue
 
                 segment = cv2.resize(segment, (self.img_shape, self.img_shape))
 
@@ -116,11 +122,11 @@ class SegmentationDataset(Dataset):
                     #TODO: Ignore labels
                     segment.fill(0) # (-1)
                 
-                segment_array[:, :, organ_index] = segment 
+                segment_array[:, :, label_index] = segment 
             
             except Exception:
                 traceback.print_exc()
-                segment_array[:, :, organ_index].fill(-1) 
+                segment_array[:, :, label_index] = np.ones((self.img_shape, self.img_shape)) * -1 
         
         if self.augment_flag:
             image, segment_array = augment_fn(image, segment_array)
@@ -171,12 +177,13 @@ def get_ml_training_set_data(dtype, path, folder_path, img_shape, min_segment_po
                 ann_paths = glob.glob(os.path.join(directory, organ, search_key + "*")) 
                 
                 organ = organ.replace(" ", "_")
-                if not organ in composite_labels:
+                if not organ in composite_labels and organ != "original_image":
                     composite_labels.append(organ)
 
                 if len(ann_paths) == 1:
                     if os.path.exists(ann_paths[0]):
-                        segment_paths[organ] = ann_paths[0]
+                        if organs is None or (not organs is None and organ in organs):
+                            segment_paths[organ] = ann_paths[0]
             
             if len(segment_paths) > 0:
 
@@ -198,14 +205,20 @@ def get_ml_training_set_data(dtype, path, folder_path, img_shape, min_segment_po
 if __name__ == "__main__":
     
     data_dir = "/home/hans/data/"
-    
+    organs = ["whole_body", "head"]
     dset = get_ml_training_set_data(dtype="segmentation/composite", path="Machine learning training set/", folder_path=data_dir, 
-            img_shape=256, min_segment_positivity_ratio=0.05, sample_dataset=False, organs=None)#, bbox_dir="bbox_dependent_images_path")
+            img_shape=256, min_segment_positivity_ratio=0.05, sample_dataset=True, organs=organs)#, bbox_dir="bbox_dependent_images_path")
 
     for img, seg, fpath in dset:
-        print (img.min(), img.max())
+        
+        print (seg[1].min(), seg[1].max())
+        for idx in range(len(organs)):
+            if -1 in seg[idx]:
+                print ('Omitting %s annotation for file %s' % (organs[idx], fpath))
+
         cv2.imshow('f', img.transpose((1,2,0)))
         cv2.imshow('g', seg[0])
+        cv2.imshow('i', seg[1])
         cv2.waitKey()
 
         print (img.shape, seg.shape, fpath)
