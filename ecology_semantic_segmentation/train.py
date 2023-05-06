@@ -80,7 +80,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
 
             #loss =  dice + generalized_dice + twersky_dice + focal_dice
             #loss = dice + generalized_dice + twersky_dice + bce_l
-            loss =  dice + generalized_dice + twersky_dice #ce_l + fl_l + sum(dice_l)
+            loss =  generalized_dice + bce_l + fl_l #dice + generalized_dice + twersky_dice #ce_l + fl_l + sum(dice_l)
             loss.backward()
             optimizer.step()
 
@@ -231,8 +231,15 @@ if __name__ == "__main__":
 
    # Training script
 
+    def worker_init_fn(worker_id):
+        torch_seed = torch.initial_seed()
+        random.seed(torch_seed + worker_id)
+        if torch_seed >= 2**30:  # make sure torch_seed + workder_id < 2**32
+            torch_seed = torch_seed % 2**30
+        np.random.seed(torch_seed + worker_id)
+
     train_dataloader = DataLoader(fish_train_dataset, shuffle=True, batch_size=args.batch_size, num_workers=3, \
-                                    worker_init_fn=lambda _: np.random.seed(random.randint(0, 2**32 - 1)))
+                                    worker_init_fn=worker_init_fn)
     val_dataloader = DataLoader(fish_val_dataset, shuffle=False, batch_size=1, num_workers=1)
     
     model_dir = EXPT_NAME + "/"
@@ -245,7 +252,7 @@ if __name__ == "__main__":
     if torch.cuda.is_available():
         vgg_unet = vgg_unet.cuda()
     
-    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.001)
+    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.0001)
     #optimizer = optim.SGD(vgg_unet.parameters(), lr=0.00001, momentum=0.9)
     
     train(vgg_unet, train_dataloader, val_dataloader, losses_fn, optimizer, save_dir=saved_dir, start_epoch=start_epoch, 

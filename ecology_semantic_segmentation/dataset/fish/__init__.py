@@ -27,9 +27,11 @@ fish_val_datasets, val_cumsum_lengths, \
 fish_test_datasets, test_cumsum_lengths = fish_train_dataset.return_val_test_datasets()
 
 fish_val_dataset = FishSubsetDataset(fish_val_datasets, val_cumsum_lengths, deepsupervision=deepsupervision) 
+[dataset.dataset.set_augment_flag(False) for dataset in fish_val_dataset.datasets]
 print ("val dataset: %d images" % len(fish_val_dataset))
 
 fish_test_dataset = FishSubsetDataset(fish_test_datasets, test_cumsum_lengths, deepsupervision=deepsupervision) 
+[dataset.dataset.set_augment_flag(False) for dataset in fish_test_dataset.datasets]
 print ("test dataset: %d images" % len(fish_test_dataset))
 
 dataset_subsets = ["fish_train_dataset", "fish_val_dataset", "fish_test_dataset"]
