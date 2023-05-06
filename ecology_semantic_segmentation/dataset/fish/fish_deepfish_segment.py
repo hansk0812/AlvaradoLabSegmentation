@@ -14,8 +14,6 @@ from . import composite_labels
 from ..augment import augment_fn
 #from ..bbox_masks_problem import remove_islands_in_segment_gt
 
-from ..bbox_masks_problem import shoelace_algorithm
-
 #from .fish_segmentation import imread
 
 class DeepFishDataset(Dataset):
