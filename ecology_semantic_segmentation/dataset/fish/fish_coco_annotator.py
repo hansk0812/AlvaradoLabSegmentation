@@ -32,7 +32,7 @@ class CocoSegmentationDataset(Dataset):
         if sample_dataset:
             coco_images, coco_txt = coco_images[:60], coco_txt[:60]
         
-        self.organs = organs
+        self.organs = composite_organs if organs is None else organs
         self.img_shape = img_shape
         self.min_segment_positivity_ratio = min_segment_positivity_ratio
         self.image_paths = coco_images
@@ -112,7 +112,7 @@ class CocoSegmentationDataset(Dataset):
         for poly in polygons:
             organ, polygon = list(poly.keys())[0], list(poly.values())[0]
             
-            organ_index = composite_labels.index(organ)
+            organ_index = self.organs.index(organ)
             seg = segment_array[:, :, organ_index].astype(np.uint8) 
 
             cv2.fillPoly(seg, [polygon], 255) 
@@ -130,11 +130,11 @@ class CocoSegmentationDataset(Dataset):
 def get_alvaradolab_data(dtype, path, folder_path, img_shape, min_segment_positivity_ratio, sample_dataset=True, organs=None, bbox_dir=None, augment_flag = True):
     
     #tracemalloc.start()
-    assert dtype == "segmentation/composite"
+    assert "segmentation/composite" in dtype
 
     images = glob.glob(os.path.join(folder_path, path, '*.jpg'))
     labels = [x.replace(".jpg", ".txt") for x in images]
-
+    
     removable_indices = []
     for idx, (img, label) in enumerate(zip(images, labels)):
         if not (os.path.exists(img) and os.path.exists(label)):
@@ -159,4 +159,25 @@ def get_alvaradolab_data(dtype, path, folder_path, img_shape, min_segment_positi
     #tracemalloc.stop()
 
     return dataset
+
+if __name__ == "__main__":
+    
+    dataset = get_alvaradolab_data(
+                    dtype=["segmentation/composite"], 
+                    path="Cichlid Picture Collection REVISED (UPDATED)/Annotated Photos/", 
+                    folder_path="/home/hans/data", 
+                    img_shape=256, 
+                    min_segment_positivity_ratio=0.05, 
+                    sample_dataset=True, 
+                    organs=["whole_body", "head"], 
+                    bbox_dir=None, 
+                    augment_flag = True)
+
+    for img, seg, fname in dataset:
+        img = img.transpose((1,2,0))*255 
+        cv2.imshow("f", img.astype(np.uint8))
+        cv2.imshow("g", (seg[0]*255).astype(np.uint8))
+        cv2.imshow("h", (seg[1]*255).astype(np.uint8))
+        print (fname)
+        cv2.waitKey()
 

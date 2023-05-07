@@ -4,6 +4,7 @@ val_images/
 */gray/gray*
 models*/*
 test_results/*
+log*.txt
 
 #Pytorch
 *.pth

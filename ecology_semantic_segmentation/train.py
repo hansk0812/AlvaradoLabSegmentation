@@ -80,7 +80,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
 
             #loss =  dice + generalized_dice + twersky_dice + focal_dice
             #loss = dice + generalized_dice + twersky_dice + bce_l
-            loss =  generalized_dice + bce_l + fl_l #dice + generalized_dice + twersky_dice #ce_l + fl_l + sum(dice_l)
+            loss =  twersky_dice #dice + generalized_dice + twersky_dice #ce_l + fl_l + sum(dice_l)
             loss.backward()
             optimizer.step()
 
@@ -252,7 +252,7 @@ if __name__ == "__main__":
     if torch.cuda.is_available():
         vgg_unet = vgg_unet.cuda()
     
-    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.0001)
+    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.00001)
     #optimizer = optim.SGD(vgg_unet.parameters(), lr=0.00001, momentum=0.9)
     
     train(vgg_unet, train_dataloader, val_dataloader, losses_fn, optimizer, save_dir=saved_dir, start_epoch=start_epoch, 
