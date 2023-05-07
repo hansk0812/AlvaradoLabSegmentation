@@ -176,10 +176,9 @@ if __name__ == "__main__":
     
     ap = argparse.ArgumentParser()
     ap.add_argument("--visualize", default="alvaradolab", help="Flag to visualize composite labels")
-    ap.add_argument("--sample_dataset", action="store_true", help="Boolean to sample dataset instead of use all data")
     args = ap.parse_args()
 
-    dataset = FishDataset(dataset_type=["segmentation/composite"], sample_dataset=args.sample_dataset, organs=["whole_body", "head"]) #"segmentation", 
+    dataset = FishDataset(dataset_type=["segmentation/composite"], sample_dataset=True, organs=["whole_body", "ventral_side", "dorsal_side"]) #"segmentation", 
     print ("train dataset: %d images" % len(dataset))
 
     val_datasets, val_cumsum_lengths, \
@@ -194,6 +193,7 @@ if __name__ == "__main__":
         cv2.imshow("f", img.astype(np.uint8))
         cv2.imshow("g", (seg[0]*255).astype(np.uint8))
         cv2.imshow("h", (seg[1]*255).astype(np.uint8))
+        cv2.imshow("i", (seg[2]*255).astype(np.uint8))
         print (fname)
         cv2.waitKey()
 
