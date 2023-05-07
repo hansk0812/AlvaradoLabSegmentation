@@ -11,7 +11,7 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader
 
 from .dataset.fish import fish_test_dataset
-from .model import vgg_unet
+from .train import vgg_unet
 
 from .train import load_recent_model
 from .loss_functions import cross_entropy_loss, dice_loss
@@ -106,15 +106,6 @@ if __name__ == "__main__":
     [x.dataset.set_augment_flag(False) for x in fish_test_dataset.datasets]
     test_dataloader = DataLoader(fish_test_dataset, shuffle=False, batch_size=batch_size, num_workers=0)
  
-    import segmentation_models_pytorch as smp
-    vgg_unet = smp.Unet(
-                encoder_name="resnet34",        # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
-                encoder_weights="imagenet",     # use `imagenet` pre-trained weights for encoder initialization
-                in_channels=3,                  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
-                classes=1,                      # model output channels (number of classes in your dataset)
-            )
-
-
     if torch.cuda.is_available():
         net = vgg_unet.cuda()
     else:
