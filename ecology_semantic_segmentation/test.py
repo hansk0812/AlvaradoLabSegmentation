@@ -36,8 +36,9 @@ def test(net, dataloader, num_epochs=100, log_every=100, batch_size=8, models_di
     
     with torch.no_grad():
         for j, test_images in enumerate(dataloader, 0):
-
-            print ("Predictions on batch: %d/%d" % (j+1, len(dataloader)), end='\r')
+            
+            # Hard-to-read log file
+            #print ("Predictions on batch: %d/%d" % (j+1, len(dataloader)), end='\r')
             
             test_images, test_labels, image_ids = test_images
 
@@ -92,16 +93,13 @@ def test(net, dataloader, num_epochs=100, log_every=100, batch_size=8, models_di
 
 if __name__ == "__main__":
     
+    batch_size = 1
+
     import argparse
     ap = argparse.ArgumentParser()
     ap.add_argument("--single_model", action="store_true", help="Flag for model selection vs testing entire test set")
     ap.add_argument("--models_dir", default="models/vgg", help="Flag for model selection vs testing entire test set")
     args = ap.parse_args()
-    
-    if args.single_model:
-        batch_size = 1
-    else:
-        batch_size = 1
     
     [x.dataset.set_augment_flag(False) for x in fish_test_dataset.datasets]
     test_dataloader = DataLoader(fish_test_dataset, shuffle=False, batch_size=batch_size, num_workers=0)
