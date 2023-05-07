@@ -179,7 +179,7 @@ if __name__ == "__main__":
     ap.add_argument("--sample_dataset", action="store_true", help="Boolean to sample dataset instead of use all data")
     args = ap.parse_args()
 
-    dataset = FishDataset(dataset_type=["segmentation", "segmentation/composite"], sample_dataset=args.sample_dataset, organs=["whole_body", "head"]) 
+    dataset = FishDataset(dataset_type=["segmentation/composite"], sample_dataset=args.sample_dataset, organs=["whole_body", "head"]) #"segmentation", 
     print ("train dataset: %d images" % len(dataset))
 
     val_datasets, val_cumsum_lengths, \
@@ -187,11 +187,13 @@ if __name__ == "__main__":
 
     valdataset = FishSubsetDataset(val_datasets, val_cumsum_lengths) 
     print ("val dataset: %d images" % len(valdataset))
-
-    for img, seg, fname in valdataset:
+    
+    for img, seg, fname in dataset:
+        print ("HERE")
         img = img.transpose((1,2,0))*255 
         cv2.imshow("f", img.astype(np.uint8))
-        cv2.imshow("g", (seg[0][0]*255).astype(np.uint8))
+        cv2.imshow("g", (seg[0]*255).astype(np.uint8))
+        cv2.imshow("h", (seg[1]*255).astype(np.uint8))
         print (fname)
         cv2.waitKey()
 
