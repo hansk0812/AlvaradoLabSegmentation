@@ -188,7 +188,6 @@ if __name__ == "__main__":
     print ("val dataset: %d images" % len(valdataset))
     
     for img, seg, fname in dataset:
-        print ("HERE")
         img = img.transpose((1,2,0))*255 
         cv2.imshow("f", img.astype(np.uint8))
         cv2.imshow("g", (seg[0]*255).astype(np.uint8))

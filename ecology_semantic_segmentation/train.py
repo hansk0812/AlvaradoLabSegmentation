@@ -80,7 +80,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
 
             #loss =  dice + generalized_dice + twersky_dice + focal_dice
             #loss = dice + generalized_dice + twersky_dice + bce_l
-            loss =  twersky_dice #dice + generalized_dice + twersky_dice #ce_l + fl_l + sum(dice_l)
+            loss =  focal_dice #dice + generalized_dice + twersky_dice #ce_l + fl_l + sum(dice_l)
             loss.backward()
             optimizer.step()
 
@@ -214,13 +214,19 @@ def load_recent_model(saved_dir, net):
         return -1
 
 import segmentation_models_pytorch as smp
-vgg_unet = smp.DeepLabV3Plus(
-            encoder_name="resnet34",        # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
+vgg_unet = smp.Unet(
+            encoder_name="resnet50",        # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
             encoder_weights="imagenet",     # use `imagenet` pre-trained weights for encoder initialization
             in_channels=3,                  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
             classes=1,                      # model output channels (number of classes in your dataset)
-            activation="silu"
         )
+#vgg_unet = smp.DeepLabV3Plus(
+#            encoder_name="resnet34",        # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
+#            encoder_weights="imagenet",     # use `imagenet` pre-trained weights for encoder initialization
+#            in_channels=3,                  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
+#            classes=1,                      # model output channels (number of classes in your dataset)
+#            activation="silu"
+#        )
 
 if __name__ == "__main__":
     
@@ -253,7 +259,7 @@ if __name__ == "__main__":
     if torch.cuda.is_available():
         vgg_unet = vgg_unet.cuda()
     
-    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.00001)
+    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.0001)
     #optimizer = optim.SGD(vgg_unet.parameters(), lr=0.00001, momentum=0.9)
     
     train(vgg_unet, train_dataloader, val_dataloader, losses_fn, optimizer, save_dir=saved_dir, start_epoch=start_epoch, 

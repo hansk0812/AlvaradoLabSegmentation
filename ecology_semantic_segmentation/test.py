@@ -24,7 +24,7 @@ def tensor_to_cv2(img_batch):
 
     return img_batch
 
-def test(net, dataloader, num_epochs=100, log_every=100, batch_size=8, models_dir="models/vgg", results_dir="test_results/", saved_epoch=-1):
+def test(net, dataloader, models_dir="models/vgg", results_dir="test_results/", batch_size=1, saved_epoch=-1):
     
     test_dice = [0, 0]
     label_dirs = ["whole_body"]
@@ -33,6 +33,11 @@ def test(net, dataloader, num_epochs=100, log_every=100, batch_size=8, models_di
             os.makedirs(os.path.join(results_dir, "%s"%str(saved_epoch).zfill(4), label_dir))
     except Exception:
         pass
+    
+    img_dir = os.path.join(results_dir, "%s"%str(saved_epoch).zfill(4), label_dir)
+    if os.path.isdir(img_dir):
+        print ("Skipping epoch %d! Test already done!" % saved_epoch)
+        return None
     
     with torch.no_grad():
         for j, test_images in enumerate(dataloader, 0):
@@ -134,6 +139,9 @@ if __name__ == "__main__":
 
         with torch.no_grad():
             dice_loss_val = test(net, test_dataloader, models_dir=models_dir, batch_size=batch_size, saved_epoch=saved_epoch)
+            if dice_loss_val is None:
+                continue
+
             test_losses.append([saved_epoch, dice_loss_val])
 
     for loss in sorted(test_losses, key = lambda x: x[1]):
