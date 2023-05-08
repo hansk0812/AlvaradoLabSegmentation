@@ -219,6 +219,7 @@ vgg_unet = smp.Unet(
             encoder_weights="imagenet",     # use `imagenet` pre-trained weights for encoder initialization
             in_channels=3,                  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
             classes=1,                      # model output channels (number of classes in your dataset)
+            activation="silu"               # changed from default relu to silu for some resnet50 tests
         )
 #vgg_unet = smp.DeepLabV3Plus(
 #            encoder_name="resnet34",        # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
