@@ -28,16 +28,15 @@ def test(net, dataloader, models_dir="models/vgg", results_dir="test_results/", 
     
     test_dice = [0, 0]
     label_dirs = ["whole_body"]
-    try:
-        for label_dir in label_dirs:
-            os.makedirs(os.path.join(results_dir, "%s"%str(saved_epoch).zfill(4), label_dir))
-    except Exception:
-        pass
     
-    img_dir = os.path.join(results_dir, "%s"%str(saved_epoch).zfill(4), label_dir)
-    if os.path.isdir(img_dir):
-        print ("Skipping epoch %d! Test already done!" % saved_epoch)
-        return None
+    for label_dir in label_dirs:
+        dir_name = os.path.join(results_dir, "%s"%str(saved_epoch).zfill(4), label_dir)
+        try:
+            os.makedirs(dir_name)
+        except Exception:
+            if os.path.isdir(dir_name):
+                print ("Skipping epoch %d! Test already done!" % saved_epoch)
+                return None
     
     with torch.no_grad():
         for j, test_images in enumerate(dataloader, 0):
