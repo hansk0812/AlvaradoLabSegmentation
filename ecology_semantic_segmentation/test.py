@@ -38,6 +38,9 @@ def test(net, dataloader, models_dir="models/vgg", results_dir="test_results/", 
                 print ("Skipping epoch %d! Test already done!" % saved_epoch)
                 return None
     
+    # deeplabv3plus GPU hotfix 
+    net = net.eval()
+
     with torch.no_grad():
         for j, test_images in enumerate(dataloader, 0):
             
