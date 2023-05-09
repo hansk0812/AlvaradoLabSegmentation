@@ -186,8 +186,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                             gt = torchcpu_to_opencv(val_labels[0][idx])
                             out = torchcpu_to_opencv(val_outputs[0][idx])
                         else:
-                            gt = torchcpu_to_opencv(val_labels[0][idx])
-                            out = torchcpu_to_opencv(val_outputs[0][idx])
+                            gt = torchcpu_to_opencv(val_labels[0][idx:idx+1])
+                            out = torchcpu_to_opencv(val_outputs[0][idx:idx+1])
 
                         imgpath = os.path.join("val_images", str(epoch), str(j)) 
 
