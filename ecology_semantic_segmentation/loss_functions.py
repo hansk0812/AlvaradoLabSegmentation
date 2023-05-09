@@ -23,7 +23,7 @@ cross_entropy_list = lambda xL, yL: torch.sum([cross_entropy_loss(x, y) for (x, 
 focal_list = lambda xL, yL: torch.sum([focal_loss(x, y, bce=True) for (x, y) in zip(xL, yL)])
 classification_dice_list = lambda xL, yL: torch.sum([classification_dice_loss(x, y, bce=True) for (x, y) in zip(xL, yL)])
 
-def cross_entropy_loss(gt, pred, weight=0.3, bce=False):
+def cross_entropy_loss(gt, pred, weight=0.3, bce=False, per_class=False):
 
     if not bce:
         ce = F.cross_entropy(pred, gt) 
@@ -32,6 +32,12 @@ def cross_entropy_loss(gt, pred, weight=0.3, bce=False):
         # more stable
         ce = binary_cross_entropy(pred, gt)
         
+        if per_class:
+            class_dim = 1
+            ce = 0
+            for idx in range(gt.shape[class_dim]):
+                ce += binary_cross_entropy(pred[:,idx,...], gt[:,idx,...])
+
         #eps = 1e-5
         #ce = F.binary_cross_entropy(pred, gt) # Tried + eps to remove nan 
         #ce = - (1-weight) * (gt*logsoftmax(pred)) - weight * (1-gt)*logsoftmax(1-pred)
