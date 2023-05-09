@@ -130,11 +130,15 @@ if __name__ == "__main__":
             saved_epoch = int(model_file.split('epoch')[-1].split('.pt')[0])
         except Exception:
             continue
-
-        if torch.cuda.is_available():
-            net.load_state_dict(torch.load(model_file))
-        else:
-            net.load_state_dict(torch.load(model_file, map_location=torch.device("cpu")))
+        
+        try:
+            if torch.cuda.is_available():
+                net.load_state_dict(torch.load(model_file))
+            else:
+                net.load_state_dict(torch.load(model_file, map_location=torch.device("cpu")))
+        except Exception:
+            print ("Skipped epoch %d because of model file incompatibility!" % saved_epoch)
+            continue
 
         with torch.no_grad():
             dice_loss_val = test(net, test_dataloader, models_dir=models_dir, batch_size=batch_size, saved_epoch=saved_epoch)
