@@ -81,9 +81,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             
             # focal_dice works great with DeepLabv3 but doesn't as much with resnet34 or resnet50
 
-            #loss =  dice + generalized_dice + twersky_dice + focal_dice
-            #loss = dice + generalized_dice + twersky_dice + bce_l
-            loss =  bce_l # focal_dice #ce_l + fl_l + sum(dice_l)
+            loss =  focal_dice #ce_l + fl_l + sum(dice_l)
             loss.backward()
             optimizer.step()
 
@@ -113,7 +111,10 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
         
         [dataset.dataset.set_augment_flag(False) for dataset in valdataloader.dataset.datasets]
         with torch.no_grad():
+            
+            # eval only works for GPU training and fails with CPU training
             net = net.eval()
+            
             val_running_loss, ce_t, bce_t, fl_t, dice_t = 0.0, 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0]
             for j, val_data in enumerate(valdataloader, 0):
                 val_inputs, val_labels, _ = val_data
@@ -193,7 +194,8 @@ def losses_fn(x, g):
         dice, generalized_dice, twersky_dice, focal_dice = classification_dice_list(x, g, factor=10)
     else: 
         bce_loss = cross_entropy_loss(x, g, bce=True)
-        ce_loss, fl_loss = cross_entropy_loss(x, g, bce=False), focal_loss(x, g, factor=1)
+        ce_loss = cross_entropy_loss(x, g, bce=False)
+        fl_loss = focal_loss(x, g, factor=1)
         dice, generalized_dice, twersky_dice, focal_dice = classification_dice_loss(x, g, factor=10)
     
     return ce_loss, bce_loss, fl_loss, dice, generalized_dice, twersky_dice, focal_dice
@@ -266,7 +268,7 @@ if __name__ == "__main__":
     if torch.cuda.is_available():
         vgg_unet = vgg_unet.cuda()
     
-    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.0005)
+    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.0001)
     #optimizer = optim.SGD(vgg_unet.parameters(), lr=0.00001, momentum=0.9)
     
     train(vgg_unet, train_dataloader, val_dataloader, losses_fn, optimizer, save_dir=saved_dir, start_epoch=start_epoch, 
