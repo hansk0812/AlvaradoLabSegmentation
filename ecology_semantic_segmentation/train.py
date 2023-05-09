@@ -78,10 +78,12 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             
             ce_l, bce_l, fl_l, dice, generalized_dice, twersky_dice, focal_dice = losses_fn(outputs, labels)
             dice_l = [dice, generalized_dice, twersky_dice, focal_dice]
+            
+            # focal_dice works great with DeepLabv3 but doesn't as much with resnet34 or resnet50
 
             #loss =  dice + generalized_dice + twersky_dice + focal_dice
             #loss = dice + generalized_dice + twersky_dice + bce_l
-            loss =  focal_dice #dice + generalized_dice + twersky_dice #ce_l + fl_l + sum(dice_l)
+            loss =  bce_l # focal_dice #ce_l + fl_l + sum(dice_l)
             loss.backward()
             optimizer.step()
 
