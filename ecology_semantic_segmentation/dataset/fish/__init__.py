@@ -7,14 +7,15 @@ composite_labels = []
 from .fish_dataset import FishDataset, FishSubsetDataset
 
 import os
-try:
-    SAMPLE_DATASET = bool(os.environ["SAMPLE"])
-except Exception:
-    SAMPLE_DATASET = False
-try:
-    IMG_SIZE = int(os.environ["IMGSIZE"])
-except Exception:
-    IMG_SIZE = 256
+def get_env_variable(name, default_value):
+    try:
+        return os.environ[name]
+    except Exception:
+        return default_value
+
+SAMPLE_DATASET = bool(get_env_variable("SAMPLE", False))
+IMG_SIZE = int(get_env_variable("IMGSIZE", 256))
+ORGANS = [x for x in get_env_variable("ORGANS", "whole_body").split(',')]
 
 # Deep Supervision implementation pending!
 deepsupervision = False
@@ -22,7 +23,8 @@ deepsupervision = False
 fish_train_dataset = FishDataset(dataset_type=["segmentation/composite"], 
                                  img_shape=IMG_SIZE, 
                                  sample_dataset=SAMPLE_DATASET,
-                                 deepsupervision=deepsupervision)
+                                 deepsupervision=deepsupervision,
+                                 organs=ORGANS)
 print ("train dataset: %d images" % len(fish_train_dataset))
 
 fish_val_datasets, val_cumsum_lengths, \

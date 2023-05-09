@@ -18,14 +18,14 @@ def augment_fn(image, masks, img_size=256):
                                GaussianBlur(blur_limit = (3,3), sigma_limit = (0.2,0.2), p = 1),
                                ZoomBlur(max_factor = 1.11, step_factor = (0.01, 0.02), p = 1),
                                RandomFog(fog_coef_lower = 0.3, fog_coef_upper = 1, alpha_coef = 0.08, p = 0.4),
-                           ], p=0.3),
+                           ], p=0.4),
                         A.OneOf([
                                 ColorJitter(hue=0.4, brightness=0.4, contrast=0.4, saturation=0.4, p=0.3),
                                 A.RandomBrightnessContrast(p=0.5),
                                 A.RandomGamma(p=0.5),
                                 Emboss(alpha=(0.3, 0.6), strength=(0.3, 0.7), p=0.3),
-                            ], p=0.1),
-                         #A.RandomResizedCrop(img_size, img_size, p=0.7),
+                            ], p=0.4),
+                         A.RandomResizedCrop(img_size, img_size, p=0.3),
                          #A.CropAndPad(percent=[30, 20]), # makes it too slow
                          #FDA([target_image], p=0.2, read_fn=lambda x: x), # makes it too slow
 #                        A.OneOf([
@@ -35,7 +35,7 @@ def augment_fn(image, masks, img_size=256):
 # Batch Size 1 for random sizes training
                        A.HorizontalFlip(p=0.5),
                        FancyPCA(p=0.3, alpha=0.35),
-                       ], p=0.5)
+                       ], p=0.7)
 
     transform = transforms(image=image, mask=masks)
     image, masks = transform["image"], np.array(transform["mask"])
