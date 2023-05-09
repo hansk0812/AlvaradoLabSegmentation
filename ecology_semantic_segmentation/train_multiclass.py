@@ -10,12 +10,32 @@ try:
 except Exception:
     MAXCHANNELS = 256
 
-EXPT_NAME = "deeplabv3_mobilenet"
+EXPT_NAME = "deeplabv3"
 
 import glob
 import traceback
 
-from . import fish_train_dataset, fish_val_dataset, fish_test_dataset
+#from . import fish_train_dataset, fish_val_dataset, fish_test_dataset
+from .dataset.fish import SAMPLE_DATASET, IMG_SIZE, ORGANS
+from .dataset.fish.fish_dataset import FishDataset, FishSubsetDataset
+fish_train_dataset = FishDataset(dataset_type=["segmentation/composite"], 
+                                 img_shape=IMG_SIZE, 
+                                 sample_dataset=SAMPLE_DATASET,
+                                 deepsupervision=False,
+                                 organs=ORGANS)
+print ("train dataset: %d images" % len(fish_train_dataset))
+
+fish_val_datasets, val_cumsum_lengths, \
+fish_test_datasets, test_cumsum_lengths = fish_train_dataset.return_val_test_datasets()
+
+fish_val_dataset = FishSubsetDataset(fish_val_datasets, val_cumsum_lengths, deepsupervision=False) 
+[dataset.dataset.set_augment_flag(False) for dataset in fish_val_dataset.datasets]
+print ("val dataset: %d images" % len(fish_val_dataset))
+
+fish_test_dataset = FishSubsetDataset(fish_test_datasets, test_cumsum_lengths, deepsupervision=False) 
+[dataset.dataset.set_augment_flag(False) for dataset in fish_test_dataset.datasets]
+print ("test dataset: %d images" % len(fish_test_dataset))
+
 from . import vgg_unet
 from .loss_functions import cross_entropy_loss, focal_loss, classification_dice_loss
 from .loss_functions import cross_entropy_list, binary_cross_entropy_list, focal_list, classification_dice_list
@@ -81,7 +101,9 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             
             # focal_dice works great with DeepLabv3 but doesn't as much with resnet34 or resnet50
 
-            loss =  generalized_dice #ce_l + fl_l + sum(dice_l)
+            #loss =  dice + generalized_dice + twersky_dice + focal_dice
+            #loss = dice + generalized_dice + twersky_dice + bce_l
+            loss =  focal_dice # focal_dice #ce_l + fl_l + sum(dice_l)
             loss.backward()
             optimizer.step()
 
@@ -111,10 +133,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
         
         [dataset.dataset.set_augment_flag(False) for dataset in valdataloader.dataset.datasets]
         with torch.no_grad():
-            
-            # eval only works for GPU training and fails with CPU training
             net = net.eval()
-            
             val_running_loss, ce_t, bce_t, fl_t, dice_t = 0.0, 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0]
             for j, val_data in enumerate(valdataloader, 0):
                 val_inputs, val_labels, _ = val_data
@@ -162,18 +181,19 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                     
                     img = torchcpu_to_opencv(val_inputs[0])
 
-                    if isinstance(val_labels, list):
-                        gt = torchcpu_to_opencv(val_labels[0][0])
-                        out = torchcpu_to_opencv(val_outputs[0][0])
-                    else:
-                        gt = torchcpu_to_opencv(val_labels[0])
-                        out = torchcpu_to_opencv(val_outputs[0])
-                    
-                    imgpath = os.path.join("val_images", str(epoch), str(j)) 
+                    for idx in range(len(ORGANS)):
+                        if isinstance(val_labels, list):
+                            gt = torchcpu_to_opencv(val_labels[0][idx])
+                            out = torchcpu_to_opencv(val_outputs[0][idx])
+                        else:
+                            gt = torchcpu_to_opencv(val_labels[0][idx])
+                            out = torchcpu_to_opencv(val_outputs[0][idx])
 
-                    cv2.imwrite(imgpath+"_img.png", img)
-                    cv2.imwrite(imgpath+"_gt.png", gt)
-                    cv2.imwrite(imgpath+"_pred.png", out)
+                        imgpath = os.path.join("val_images", str(epoch), str(j)) 
+
+                        cv2.imwrite(imgpath+"_img.png", img)
+                        cv2.imwrite(imgpath+"_gt.png", gt)
+                        cv2.imwrite(imgpath+"_pred_organ%d.png" % idx, out)
 
             num_avg = float(len(valdataloader)*val_inputs.shape[0])
             val_running_loss /= float(num_avg)
@@ -187,15 +207,20 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
 
     print('finished training')
 
-def losses_fn(x, g): 
+def losses_fn(x, g):
+    
+    CLASS_INDEX = 1
+    if g.shape[CLASS_INDEX] > 1:
+        losses = [losses_fn(g[:,idx:idx+1,:,:], x[:,idx:idx+1,:,:]) for idx in range(g.shape[CLASS_INDEX])]
+        return [sum(i) for i in zip(*losses)]
+    
     if isinstance(x, list):
         bce_loss = binary_cross_entropy_list(x, g)
         ce_loss, fl_loss = cross_entropy_list(x, g), focal_list(x, g, factor=1e-5)
         dice, generalized_dice, twersky_dice, focal_dice = classification_dice_list(x, g, factor=10)
     else: 
         bce_loss = cross_entropy_loss(x, g, bce=True)
-        ce_loss = cross_entropy_loss(x, g, bce=False)
-        fl_loss = focal_loss(x, g, factor=1)
+        ce_loss, fl_loss = cross_entropy_loss(x, g, bce=False), focal_loss(x, g, factor=1)
         dice, generalized_dice, twersky_dice, focal_dice = classification_dice_loss(x, g, factor=10)
     
     return ce_loss, bce_loss, fl_loss, dice, generalized_dice, twersky_dice, focal_dice
@@ -230,10 +255,10 @@ import segmentation_models_pytorch as smp
 #        )
 
 vgg_unet = smp.DeepLabV3Plus(
-            encoder_name="mobilenet_v2",        # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
+            encoder_name="resnet34",        # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
             encoder_weights="imagenet",     # use `imagenet` pre-trained weights for encoder initialization
             in_channels=3,                  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
-            classes=1,                      # model output channels (number of classes in your dataset)
+            classes=len(ORGANS),                      # model output channels (number of classes in your dataset)
             #activation="silu"
         )
 
@@ -256,7 +281,7 @@ if __name__ == "__main__":
 
     train_dataloader = DataLoader(fish_train_dataset, shuffle=True, batch_size=args.batch_size, num_workers=3, \
                                     worker_init_fn=worker_init_fn)
-    val_dataloader = DataLoader(fish_val_dataset, shuffle=False, batch_size=2, num_workers=1)
+    val_dataloader = DataLoader(fish_val_dataset, shuffle=False, batch_size=1, num_workers=1)
     
     model_dir = EXPT_NAME + "/"
     saved_dir = "models/"+model_dir
@@ -268,7 +293,7 @@ if __name__ == "__main__":
     if torch.cuda.is_available():
         vgg_unet = vgg_unet.cuda()
     
-    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.0001)
+    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.001)
     #optimizer = optim.SGD(vgg_unet.parameters(), lr=0.00001, momentum=0.9)
     
     train(vgg_unet, train_dataloader, val_dataloader, losses_fn, optimizer, save_dir=saved_dir, start_epoch=start_epoch, 
