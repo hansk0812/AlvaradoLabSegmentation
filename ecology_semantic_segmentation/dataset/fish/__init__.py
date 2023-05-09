@@ -15,6 +15,8 @@ try:
     IMG_SIZE = int(os.environ["IMGSIZE"])
 except Exception:
     IMG_SIZE = 256
+
+# Deep Supervision implementation pending!
 deepsupervision = False
 
 fish_train_dataset = FishDataset(dataset_type=["segmentation/composite"], 
