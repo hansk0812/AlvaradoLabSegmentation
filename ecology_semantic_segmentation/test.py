@@ -51,7 +51,7 @@ def test(net, dataloader, models_dir="models/vgg", results_dir="test_results/", 
                 test_labels = test_labels.cuda()
             
             test_outputs = F.sigmoid(net(test_images))
-            
+
             test_dice = [test_dice[0] - dice_loss(test_outputs, test_labels), test_dice[1]+1]
 
             if torch.cuda.is_available():

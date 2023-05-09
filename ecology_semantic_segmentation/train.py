@@ -10,7 +10,7 @@ try:
 except Exception:
     MAXCHANNELS = 256
 
-EXPT_NAME = "unet_resnet50"
+EXPT_NAME = "deeplabv3"
 
 import glob
 import traceback
@@ -36,6 +36,7 @@ torchcpu_to_opencv = lambda img: (img.numpy().transpose((1,2,0))*255).astype(np.
 
 def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, start_epoch, num_epochs=5000, log_every=100):
     
+    net = net.train()
     if not os.path.isdir("val_images"):
         os.mkdir("val_images")
     if not os.path.isdir(os.path.join(save_dir, "channels%d" % MAXCHANNELS, "img%d" % IMGSIZE)):
@@ -110,6 +111,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
         
         [dataset.dataset.set_augment_flag(False) for dataset in valdataloader.dataset.datasets]
         with torch.no_grad():
+            net = net.eval()
             val_running_loss, ce_t, bce_t, fl_t, dice_t = 0.0, 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0]
             for j, val_data in enumerate(valdataloader, 0):
                 val_inputs, val_labels, _ = val_data
@@ -120,7 +122,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                     else:
                         val_inputs, val_labels = val_inputs.cuda(), val_labels.cuda()
                 
-                val_outputs = F.sigmoid(net(val_inputs))
+                val_outputs = net(val_inputs)
+                val_outputs = F.sigmoid(val_outputs)
                 
                 if isinstance(val_outputs, tuple):
                     val_outputs = [val_outputs[0]] + val_outputs[1]
@@ -214,20 +217,21 @@ def load_recent_model(saved_dir, net):
         return -1
 
 import segmentation_models_pytorch as smp
-vgg_unet = smp.Unet(
-            encoder_name="resnet50",        # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
-            encoder_weights="imagenet",     # use `imagenet` pre-trained weights for encoder initialization
-            in_channels=3,                  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
-            classes=1,                      # model output channels (number of classes in your dataset)
-            activation="silu"               # changed from default relu to silu for some resnet50 tests
-        )
-#vgg_unet = smp.DeepLabV3Plus(
-#            encoder_name="resnet34",        # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
+#vgg_unet = smp.Unet(
+#            encoder_name="resnet50",        # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
 #            encoder_weights="imagenet",     # use `imagenet` pre-trained weights for encoder initialization
 #            in_channels=3,                  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
 #            classes=1,                      # model output channels (number of classes in your dataset)
-#            activation="silu"
+#            #activation="silu"              ReLU makes sigmoid more stable # changed from default relu to silu for some resnet50 tests
 #        )
+
+vgg_unet = smp.DeepLabV3Plus(
+            encoder_name="resnet34",        # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
+            encoder_weights="imagenet",     # use `imagenet` pre-trained weights for encoder initialization
+            in_channels=3,                  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
+            classes=1,                      # model output channels (number of classes in your dataset)
+            #activation="silu"
+        )
 
 if __name__ == "__main__":
     
@@ -248,7 +252,7 @@ if __name__ == "__main__":
 
     train_dataloader = DataLoader(fish_train_dataset, shuffle=True, batch_size=args.batch_size, num_workers=3, \
                                     worker_init_fn=worker_init_fn)
-    val_dataloader = DataLoader(fish_val_dataset, shuffle=False, batch_size=1, num_workers=1)
+    val_dataloader = DataLoader(fish_val_dataset, shuffle=False, batch_size=2, num_workers=1)
     
     model_dir = EXPT_NAME + "/"
     saved_dir = "models/"+model_dir
@@ -260,7 +264,7 @@ if __name__ == "__main__":
     if torch.cuda.is_available():
         vgg_unet = vgg_unet.cuda()
     
-    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.0001)
+    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.0005)
     #optimizer = optim.SGD(vgg_unet.parameters(), lr=0.00001, momentum=0.9)
     
     train(vgg_unet, train_dataloader, val_dataloader, losses_fn, optimizer, save_dir=saved_dir, start_epoch=start_epoch, 
