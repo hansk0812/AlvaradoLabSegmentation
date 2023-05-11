@@ -2,7 +2,17 @@ import numpy as np
 
 import cv2
 import albumentations as A
-from albumentations.augmentations.transforms import FancyPCA, HueSaturationValue, CLAHE, ColorJitter, Emboss, RandomFog
+from albumentations.augmentations.transforms import (
+        FancyPCA, 
+        HueSaturationValue, 
+        CLAHE, 
+        ColorJitter, 
+        Emboss, 
+        RandomFog, 
+        ChannelShuffle, 
+        RandomToneCurve,
+        ToGray, 
+        UnsharpMask)
 
 from albumentations.augmentations.geometric.functional import rotate
 from albumentations.augmentations.blur.transforms import GaussianBlur, Defocus, ZoomBlur
@@ -35,6 +45,11 @@ def augment_fn(image, masks, img_size=256):
 # Batch Size 1 for random sizes training
                        A.HorizontalFlip(p=0.5),
                        FancyPCA(p=0.3, alpha=0.35),
+                       ChannelShuffle(p=0.5),
+                       ToGray(p=0.3),
+                       # this forces edge detection to create false positives if trained for long
+                       #UnsharpMask(blur_limit=(3, 7), \
+                       #        sigma_limit=0.0, alpha=(0.2, 0.5), threshold=10, always_apply=True, p=0.1) 
                        ], p=0.7)
 
     transform = transforms(image=image, mask=masks)
@@ -51,6 +66,10 @@ def augment_fn(image, masks, img_size=256):
     if np.random.rand() < 0.4:
         image, masks = Arotate(image, masks, p=1)
     
+    if np.random.rand() < 0.5:
+        brightness_transform = RandomToneCurve(scale=0.25, p=0.5)
+        image = brightness_transform(image=image)["image"]
+
     del target_image
 
     return image, masks
@@ -82,13 +101,14 @@ if __name__ == "__main__":
                        segment.transpose((1,2,0)).astype(np.uint8)*255
         print ("saving f.png")
         cv2.imwrite('f.png', img)
-        cv2.imwrite('fm.png', segment[:,:,0])
+        #cv2.imwrite('fm.png', segment[:,:,0])
         
-        #augment_fn = CLAHE(p=1, clip_limit = [1, 4.0], tile_grid_size= [8, 8])
+        augment_fn = UnsharpMask (blur_limit=(3, 7), sigma_limit=0.0, alpha=(0.2, 0.5), threshold=10, always_apply=True, p=1)
         aug = augment_fn(image=img)
         img = aug["image"]
-        cv2.imwrite('FDA.png', img)
-        
+        cv2.imwrite('unsharpmask.png', img)
+        exit()
+
         img, segment = augment_fn(img, segment)
         print ("saving g.png")
         cv2.imwrite('g.png', img)

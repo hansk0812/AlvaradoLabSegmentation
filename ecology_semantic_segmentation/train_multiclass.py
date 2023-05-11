@@ -103,7 +103,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
 
             #loss =  dice + generalized_dice + twersky_dice + focal_dice
             #loss = dice + generalized_dice + twersky_dice + bce_l
-            loss =  focal_dice # focal_dice #ce_l + fl_l + sum(dice_l)
+            loss =  dice + 10*focal_dice + bce_l # focal_dice #ce_l + fl_l + sum(dice_l)
             loss.backward()
             optimizer.step()
 
@@ -192,7 +192,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                         imgpath = os.path.join("val_images", str(epoch), str(j)) 
 
                         cv2.imwrite(imgpath+"_img.png", img)
-                        cv2.imwrite(imgpath+"_gt.png", gt)
+                        cv2.imwrite(imgpath+"_gt_organ%d.png" % idx, gt)
                         cv2.imwrite(imgpath+"_pred_organ%d.png" % idx, out)
 
             num_avg = float(len(valdataloader)*val_inputs.shape[0])
@@ -225,12 +225,18 @@ def losses_fn(x, g):
     
     return ce_loss, bce_loss, fl_loss, dice, generalized_dice, twersky_dice, focal_dice
 
-def load_recent_model(saved_dir, net):
+def load_recent_model(saved_dir, net, epoch=None):
     
     try:
         gl = glob.glob(os.path.join(saved_dir, "channels%d" % MAXCHANNELS, 
-                            "img%d" % IMGSIZE, "%s*"%EXPT_NAME)) 
-        index = np.argmax([int(x.split("epoch")[-1].split('.')[0]) for x in gl]) 
+                            "img%d" % IMGSIZE, "%s*"%EXPT_NAME))
+        
+        epochs_list = [int(x.split("epoch")[-1].split('.')[0]) for x in gl] 
+        if epoch is None:
+            index = np.argmax(epochs_list) 
+        else:
+            index = epochs_list.index(epoch)
+
         model_file = gl[index]
 
         start_epoch = int(model_file.split("epoch")[-1].split('.')[0])
@@ -240,7 +246,10 @@ def load_recent_model(saved_dir, net):
             load_state = torch.load(model_file)
         print ("Used latest model file: %s" % model_file)
         net.load_state_dict(load_state)
-        return start_epoch
+        
+        if epoch is None:
+            return start_epoch
+    
     except Exception:
         traceback.print_exc()
         return -1
@@ -254,6 +263,7 @@ import segmentation_models_pytorch as smp
 #            #activation="silu"              ReLU makes sigmoid more stable # changed from default relu to silu for some resnet50 tests
 #        )
 
+#TODO: Layer normalization
 vgg_unet = smp.DeepLabV3Plus(
             encoder_name="resnet34",        # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
             encoder_weights="imagenet",     # use `imagenet` pre-trained weights for encoder initialization
@@ -293,8 +303,8 @@ if __name__ == "__main__":
     if torch.cuda.is_available():
         vgg_unet = vgg_unet.cuda()
     
-    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.001)
-    #optimizer = optim.SGD(vgg_unet.parameters(), lr=0.00001, momentum=0.9)
+    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.00003)
+    #optimizer = optim.SGD(vgg_unet.parameters(), lr=0.001, momentum=0.9)
     
     train(vgg_unet, train_dataloader, val_dataloader, losses_fn, optimizer, save_dir=saved_dir, start_epoch=start_epoch, 
             log_every = len(train_dataloader) // 5)
