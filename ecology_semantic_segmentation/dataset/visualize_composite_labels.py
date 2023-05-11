@@ -3,10 +3,14 @@ import numpy as np
 
 from . import CPARTS, colors 
 
-def display_composite_annotations(image, labels_map, composite_labels, min_positivity_ratio = 0.009, hide_whole_body_segment=False, show_composite_parts=True):
-        
+# Pytorch dataset --> cv2 images
+def display_composite_annotations(image, labels_map, composite_labels, 
+        min_positivity_ratio = 0.009, hide_whole_body_segment=False, show_composite_parts=True, return_image=False):
+    
+    print (composite_labels)
+    return_images = []
     alpha = 0.8
-
+    
     image = image.transpose((1,2,0)).astype(np.uint8)
     #cv2.imshow("image", image)
     
@@ -23,7 +27,9 @@ def display_composite_annotations(image, labels_map, composite_labels, min_posit
 
     labels_map = labels_map.transpose((1,2,0)).astype(np.uint8)
     
-    outer_loop_times = len(CPARTS) if show_composite_parts and any([x in composite_labels for y in CPARTS for x in y]) else 1
+    outer_loop_times = len(CPARTS) if not return_image and \
+                        show_composite_parts and \
+                        any([x in composite_labels for y in CPARTS for x in y]) else 1
     
     image_copy = image.copy()
 
@@ -61,12 +67,16 @@ def display_composite_annotations(image, labels_map, composite_labels, min_posit
                         visited_cparts.append(CPARTS[outer_loop_idx].index(composite_labels[seg_id]))
                     else:
                         continue
-
-            cv2.imshow("fish_%s"%composite_labels[seg_id], labels_map[:,:,seg_id])
+            
+            if not return_image:
+                cv2.imshow("fish_%s"%composite_labels[seg_id], labels_map[:,:,seg_id])
             
             seg_image = np.expand_dims(labels_map[:,:,seg_id], axis=-1).repeat(3, axis=-1) * np.array(colors[seg_id]).astype(np.uint8)
             seg_image = cv2.addWeighted(image, 1, seg_image, 1, 1.0)
             image = cv2.addWeighted(image, 1-alpha, seg_image, alpha, 1.0)
+        
+            if return_image:
+                return_images.append({composite_labels[seg_id]: image})
         
         missing_annotation_indices = set(range(len(CPARTS[outer_loop_idx]))) - set(visited_cparts)
         if len(missing_annotation_indices) > 0:
@@ -74,14 +84,20 @@ def display_composite_annotations(image, labels_map, composite_labels, min_posit
             
             if all([x==y for x, y in zip(sorted(missing_annotation_indices), range(len(CPARTS[outer_loop_idx])))]):
                 continue
-
-        cv2.imshow("fish_%s"%( "all_parts" if outer_loop_times == 1 else ", ".join(CPARTS[outer_loop_idx])
-                        ), image)
-        cv2.waitKey()
         
-        print ("\n", "."*50, "\n")
-
+        ann_type =  "all_parts" if outer_loop_times == 1 else \
+                        ", ".join(CPARTS[outer_loop_idx])
+        if not return_image:
+            cv2.imshow("fish_%s"%(ann_type), image)
+            cv2.waitKey()
+        else:
+            return_images.append({ann_type: image})
+        
         image = image_copy
 
-    cv2.destroyAllWindows()
- 
+    print ("\n", "."*50, "\n")
+
+    if not return_image:
+        cv2.destroyAllWindows()
+    else:
+        return return_images
