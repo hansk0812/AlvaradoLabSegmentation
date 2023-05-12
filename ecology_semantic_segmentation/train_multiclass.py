@@ -103,7 +103,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
 
             #loss =  dice + generalized_dice + twersky_dice + focal_dice
             #loss = dice + generalized_dice + twersky_dice + bce_l
-            loss =  dice + 10*focal_dice + bce_l # focal_dice #ce_l + fl_l + sum(dice_l)
+            loss =  focal_dice  # focal_dice #ce_l + fl_l + sum(dice_l)
             loss.backward()
             optimizer.step()
 
@@ -226,14 +226,17 @@ def losses_fn(x, g):
     return ce_loss, bce_loss, fl_loss, dice, generalized_dice, twersky_dice, focal_dice
 
 def load_recent_model(saved_dir, net, epoch=None):
-    
+    # Load model from a particular epoch and train like the rest of the epochs are relevant anyway
+    #TODO: Delete all models from epoch to latest_epoch to enable checkpoint dir consistency
+
     try:
         gl = glob.glob(os.path.join(saved_dir, "channels%d" % MAXCHANNELS, 
                             "img%d" % IMGSIZE, "%s*"%EXPT_NAME))
         
         epochs_list = [int(x.split("epoch")[-1].split('.')[0]) for x in gl] 
+        latest_index = np.argmax(epochs_list) 
         if epoch is None:
-            index = np.argmax(epochs_list) 
+            index = latest_index
         else:
             index = epochs_list.index(epoch)
 
@@ -249,6 +252,8 @@ def load_recent_model(saved_dir, net, epoch=None):
         
         if epoch is None:
             return start_epoch
+        else:
+            return latest_index + 1
     
     except Exception:
         traceback.print_exc()
@@ -277,7 +282,8 @@ if __name__ == "__main__":
     #TODO Discretized image sizes to closest multiple of 8
    
     ap = argparse.ArgumentParser()
-    ap.add_argument("--batch_size", default=7, type=int, help="imgsize -> batchsize: 256 -> 7; 128 -> 20;")
+    ap.add_argument("--batch_size", default=7, type=int, help="Multiples of 9 give the best GPU utilization (~2023)")
+    ap.add_argument("--start_epoch", default=0, type=int, help="Start training from a known model for a conceptual optimization landscape")
     args = ap.parse_args()
 
    # Training script
@@ -298,7 +304,7 @@ if __name__ == "__main__":
     if not os.path.isdir(saved_dir):
         os.makedirs(saved_dir)
 
-    start_epoch = load_recent_model(saved_dir, vgg_unet)
+    start_epoch = load_recent_model(saved_dir, vgg_unet, epoch=None if args.start_epoch==0 else args.start_epoch)
     
     if torch.cuda.is_available():
         vgg_unet = vgg_unet.cuda()
