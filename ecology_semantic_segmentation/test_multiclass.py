@@ -56,7 +56,12 @@ def test(net, dataloader, models_dir="models/vgg", results_dir="test_results/", 
             
             test_outputs = F.sigmoid(net(test_images))
 
-            test_dice = [test_dice[0] - dice_loss(test_outputs, test_labels), test_dice[1]+1]
+            CLASS_INDEX = 1
+            if test_labels.shape[CLASS_INDEX] > 1:
+                loss = sum([dice_loss(test_outputs[:,idx:idx+1,:,:], test_labels[:,idx:idx+1,:,:]) \
+                                for idx in range(test_labels.shape[CLASS_INDEX])]) / float(test_labels.shape[CLASS_INDEX])
+                
+                test_dice = [test_dice[0] - loss, test_dice[1]+1]
 
             if torch.cuda.is_available():
                 test_images = test_images.cpu()
@@ -67,13 +72,12 @@ def test(net, dataloader, models_dir="models/vgg", results_dir="test_results/", 
             test_labels = (test_labels.numpy() * 255).astype(np.uint8)
             test_outputs = (test_outputs.numpy() * 255).astype(np.uint8)
 
-            preds = display_composite_annotations(test_images[0], test_outputs[0], ORGANS, return_image=True)
-            gts = display_composite_annotations(test_images[0], test_labels[0], ORGANS, return_image=True)
+            preds = display_composite_annotations(test_images[0], test_outputs[0], ORGANS, return_image=True, verbose=False)
+            gts = display_composite_annotations(test_images[0], test_labels[0], ORGANS, return_image=True, verbose=False)
             
             img_keys = [list(x.keys())[0] for x in gts]
 
             for idx, key in enumerate(img_keys):
-                print (test_images.shape, gts[idx][key].shape, preds[idx][key].shape)
 
                 cv2.imwrite(os.path.join(dir_name, key+"_%d_gt.png" % j), gts[idx][key])
                 cv2.imwrite(os.path.join(dir_name, key+"_%d_pred.png" % j), preds[idx][key])

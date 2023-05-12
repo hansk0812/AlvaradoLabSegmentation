@@ -103,7 +103,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
 
             #loss =  dice + generalized_dice + twersky_dice + focal_dice
             #loss = dice + generalized_dice + twersky_dice + bce_l
-            loss =  focal_dice  # focal_dice #ce_l + fl_l + sum(dice_l)
+            loss =  focal_dice + generalized_dice # focal_dice #ce_l + fl_l + sum(dice_l)
             loss.backward()
             optimizer.step()
 
