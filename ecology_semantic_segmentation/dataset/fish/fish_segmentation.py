@@ -61,7 +61,7 @@ class SegmentationDataset(Dataset):
         self.organs = organs
         
         if not organs is None:
-            self.label_indices = sorted([self.composite_labels.index(organ) for organ in organs])
+            self.label_indices = [self.composite_labels.index(organ) for organ in organs]
         else:
             self.label_indices = list(range(len(self.composite_labels)))
 
