@@ -5,29 +5,15 @@ import glob
 import traceback
 
 from . import fish_train_dataset, fish_val_dataset, fish_test_dataset
-from .dataset.fish import ORGANS, IMGSIZE, MAXCHANNELS, EXPTNAME
-#from .dataset.fish.fish_dataset import FishDataset, FishSubsetDataset
-#fish_train_dataset = FishDataset(dataset_type=["segmentation/composite"], 
-#                                 img_shape=IMG_SIZE, 
-#                                 sample_dataset=SAMPLE_DATASET,
-#                                 deepsupervision=False,
-#                                 organs=ORGANS)
-#print ("train dataset: %d images" % len(fish_train_dataset))
-#
-#fish_val_datasets, val_cumsum_lengths, \
-#fish_test_datasets, test_cumsum_lengths = fish_train_dataset.return_val_test_datasets()
-#
-#fish_val_dataset = FishSubsetDataset(fish_val_datasets, val_cumsum_lengths, deepsupervision=False) 
-#[dataset.dataset.set_augment_flag(False) for dataset in fish_val_dataset.datasets]
-#print ("val dataset: %d images" % len(fish_val_dataset))
-#
-#fish_test_dataset = FishSubsetDataset(fish_test_datasets, test_cumsum_lengths, deepsupervision=False) 
-#[dataset.dataset.set_augment_flag(False) for dataset in fish_test_dataset.datasets]
-#print ("test dataset: %d images" % len(fish_test_dataset))
+
+from .dataset.fish import ORGANS, IMGSIZE, MAXCHANNELS, get_env_variable
+EXPTNAME = get_env_variable("EXPTNAME", default_value="deeplabv3p")
 
 from . import unet_model
 from .loss_functions import cross_entropy_loss, focal_loss, classification_dice_loss
 from .loss_functions import cross_entropy_list, binary_cross_entropy_list, focal_list, classification_dice_list
+
+from .loss_functions import dice_loss
 
 #import get_deepfish_dataset
 import random
@@ -91,12 +77,6 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             
             ce_l, bce_l, fl_l, dice, generalized_dice, twersky_dice, focal_dice = losses_fn(outputs, labels)
             dice_l = [dice, generalized_dice, twersky_dice, focal_dice]
-            
-            #TODO: Future work
-            # background dice losses
-            _, _, _, bg_dice, bg_generalized_dice, bg_twersky_dice, bg_focal_dice = losses_fn(1-outputs, 1-labels)
-            k = 1
-            dice_l = [dice_l[0] + k*bg_dice, dice_l[1] + k*bg_generalized_dice, dice_l[2] + k*bg_twersky_dice, dice_l[3] + k*bg_focal_dice]
             
             # focal_dice works great with DeepLabv3 but doesn't as much with resnet34 or resnet50
 
@@ -206,23 +186,29 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
 
     print('finished training')
 
-def losses_fn(x, g, composite_set_theory=False):
+def losses_fn(x, g, composite_set_theory=False, test=False):
     
     # Hardcoded subset membership loss for each composite set of organs
 
     CLASS_INDEX = 1
     if g.shape[CLASS_INDEX] > 1:
         losses = [losses_fn(g[:,idx:idx+1,:,:], x[:,idx:idx+1,:,:]) for idx in range(g.shape[CLASS_INDEX])]
-        return [sum(i) for i in zip(*losses)]
+        return [sum(i)/float(g.shape[CLASS_INDEX]) for i in zip(*losses)]
     
     if isinstance(x, list):
         bce_loss = binary_cross_entropy_list(x, g)
         ce_loss, fl_loss = cross_entropy_list(x, g), focal_list(x, g, factor=1e-5)
         dice, generalized_dice, twersky_dice, focal_dice = classification_dice_list(x, g, factor=10)
     else: 
+        
+        if test:
+            return dice_loss(x, g)
+
         bce_loss = cross_entropy_loss(x, g, bce=True)
         ce_loss, fl_loss = cross_entropy_loss(x, g, bce=False), focal_loss(x, g, factor=1)
-        dice, generalized_dice, twersky_dice, focal_dice = classification_dice_loss(x, g, factor=10)
+
+        k = 1 # background weight
+        dice, generalized_dice, twersky_dice, focal_dice = classification_dice_loss(x, g, factor=10, background_weight=k)
     
     whole_body_g, whole_body_p = g[:,0:1,...], x[:,0:1,...]
     ventral_side_g, ventral_side_p = g[:,1:2,...], x[:,1:2,...]
@@ -310,8 +296,7 @@ if __name__ == "__main__":
                                     worker_init_fn=worker_init_fn)
     val_dataloader = DataLoader(fish_val_dataset, shuffle=False, batch_size=1, num_workers=1)
     
-    model_dir = EXPTNAME + "/"
-    saved_dir = "models/"+model_dir
+    saved_dir = os.path.join("models", EXPTNAME)
     if not os.path.isdir(saved_dir):
         os.makedirs(saved_dir)
 

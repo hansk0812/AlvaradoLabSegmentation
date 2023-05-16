@@ -21,7 +21,7 @@ def binary_cross_entropy_list(gt, pred):
 
 cross_entropy_list = lambda xL, yL: torch.sum([cross_entropy_loss(x, y) for (x, y) in zip(xL, yL)])
 focal_list = lambda xL, yL: torch.sum([focal_loss(x, y, bce=True) for (x, y) in zip(xL, yL)])
-classification_dice_list = lambda xL, yL: torch.sum([classification_dice_loss(x, y, bce=True) for (x, y) in zip(xL, yL)])
+classification_dice_list = lambda xL, yL: torch.sum([classification_dice_loss(x, y, bce=True, 1) for (x, y) in zip(xL, yL)])
 
 def cross_entropy_loss(gt, pred, weight=0.3, bce=False):
 
@@ -43,7 +43,7 @@ def focal_loss(gt, pred, gamma=1.5, factor=0.1):
     fl = - torch.pow((1-pred), gamma)*torch.log(pred+1e-7)
     return factor * torch.mean(fl)
 
-def dice_loss(gt, pred, generalized=False):
+def dice_loss(gt, pred, generalized=False, generalized_k = 1):
 
     if not generalized:
         dl_n = 2 * torch.sum(gt * pred)
@@ -60,10 +60,10 @@ def dice_loss(gt, pred, generalized=False):
 
         dice_coeff_preds_fg = torch.sum(G1 * P1) + 1e-7
         dice_coeff_preds_bg = torch.sum(G0 * P0) + 1e-7
-        dice_coeff_normalize_fg = torch.sum(G1 +P1) + 1e-7
-        dice_coeff_normalize_bg = torch.sum(G0 + P0) + 1e-7
+        dice_coeff_normalize_fg = torch.sum(G1*G1 + P1*P1) + 1e-7
+        dice_coeff_normalize_bg = torch.sum(G0*G0 + P0*P0) + 1e-7
         
-        dc = (dice_coeff_preds_fg / dice_coeff_normalize_fg) + (dice_coeff_preds_bg / dice_coeff_normalize_bg)
+        dc = (dice_coeff_preds_fg / dice_coeff_normalize_fg) + generalized_k * (dice_coeff_preds_bg / dice_coeff_normalize_bg)
         
         return - dc
 
@@ -82,10 +82,10 @@ def focal_dice_coefficient(gt, pred, alpha=0.5, beta=0.3, gamma=1.8):
     dice_coeff = (dl_n + 1e-7) / (dl_d + 1e-7)
     return - torch.pow(1-dice_coeff, gamma) * torch.log(dice_coeff + 1e-7)
 
-def classification_dice_loss(gt, pred, factor=1e3):
+def classification_dice_loss(gt, pred, factor=1e3, background_weight=1):
     
     dice_l = dice_loss(gt, pred)
-    generalized_dice_l = dice_loss(gt, pred, generalized=True)
+    generalized_dice_l = dice_loss(gt, pred, generalized=True, generalized_k=background_weight)
     twersky_l = twersky_loss(gt, pred)
     focal_dice_l = focal_dice_coefficient(gt, pred) 
     m = factor * 0.33 
