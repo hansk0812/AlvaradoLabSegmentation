@@ -14,14 +14,15 @@ def get_env_variable(name, default_value):
         return default_value
 
 SAMPLE_DATASET = bool(get_env_variable("SAMPLE", False))
-IMG_SIZE = int(get_env_variable("IMGSIZE", 256))
+IMGSIZE = int(get_env_variable("IMGSIZE", 256))
+MAXCHANNELS = int(get_env_variable("MAXCHANNELS", 256))
 ORGANS = [x for x in get_env_variable("ORGANS", "whole_body").split(',')]
 
 # Deep Supervision implementation pending!
 deepsupervision = False
 
 fish_train_dataset = FishDataset(dataset_type=["segmentation/composite"], 
-                                 img_shape=IMG_SIZE, 
+                                 img_shape=IMGSIZE, 
                                  sample_dataset=SAMPLE_DATASET,
                                  deepsupervision=deepsupervision,
                                  organs=ORGANS)

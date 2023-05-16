@@ -4,10 +4,9 @@ import numpy as np
 from . import CPARTS, colors 
 
 # Pytorch dataset --> cv2 images
-def display_composite_annotations(image, labels_map, composite_labels, 
+def display_composite_annotations(image, labels_map, composite_labels, verbose=True,
         min_positivity_ratio = 0.009, hide_whole_body_segment=False, show_composite_parts=True, return_image=False):
     
-    print (composite_labels)
     return_images = []
     alpha = 0.8
     
@@ -18,9 +17,11 @@ def display_composite_annotations(image, labels_map, composite_labels,
         largest_segment_id = np.argmax(labels_map.sum(axis=(1,2)))
 
         if composite_labels[largest_segment_id] == "whole_body":
-            print ("\nIgnoring largest segment %s!" % composite_labels[largest_segment_id])
+            if verbose:
+                print ("\nIgnoring largest segment %s!" % composite_labels[largest_segment_id])
         else:
-            print ("\nCannot find whole body segment!")
+            if verbose:
+                print ("\nCannot find whole body segment!")
             largest_segment_id = -1
     else:
         largest_segment_id = 0
@@ -58,6 +59,7 @@ def display_composite_annotations(image, labels_map, composite_labels,
                     seg_mask_ratio = np.sum(labels_map[:,:,seg_id]) / (255.0 * np.prod(labels_map.shape[:2]))
                     seg_mask_ratio = seg_mask_ratio / subset_ratio_denominator
             
+                if verbose:
                     print ("%s mask ratio wrt image: %f" % (composite_labels[seg_id] + \
                                                     ("" if "whole_body" == composite_labels[seg_id] else (
                                                     " subset ratio wrt whole_body" if subset_ratio_denominator!=1.0 else "")), 
@@ -80,7 +82,8 @@ def display_composite_annotations(image, labels_map, composite_labels,
         
         missing_annotation_indices = set(range(len(CPARTS[outer_loop_idx]))) - set(visited_cparts)
         if len(missing_annotation_indices) > 0:
-            print ("Cannot find annotations for %s" % ", ".join([CPARTS[outer_loop_idx][x] for x in missing_annotation_indices])) 
+            if verbose:
+                print ("Cannot find annotations for %s" % ", ".join([CPARTS[outer_loop_idx][x] for x in missing_annotation_indices])) 
             
             if all([x==y for x, y in zip(sorted(missing_annotation_indices), range(len(CPARTS[outer_loop_idx])))]):
                 continue
@@ -95,7 +98,8 @@ def display_composite_annotations(image, labels_map, composite_labels,
         
         image = image_copy
 
-    print ("\n", "."*50, "\n")
+    if verbose:
+        print ("\n", "."*50, "\n")
 
     if not return_image:
         cv2.destroyAllWindows()
