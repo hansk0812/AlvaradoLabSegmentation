@@ -82,7 +82,11 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
 
             #loss =  dice + generalized_dice + twersky_dice + focal_dice
             #loss = dice + generalized_dice + twersky_dice + bce_l
-            loss = focal_dice + generalized_dice + k * (bg_focal_dice + bg_generalized_dice) # focal_dice #ce_l + fl_l + sum(dice_l)
+            loss = focal_dice + generalized_dice 
+            # Chose generalized_dice with k for correctness' sake when focal_dice_bg was giving good variation 
+            # + k * (bg_focal_dice + bg_generalized_dice)
+            
+            # focal_dice #ce_l + fl_l + sum(dice_l)
             loss.backward()
             optimizer.step()
 
@@ -193,7 +197,7 @@ def losses_fn(x, g, composite_set_theory=False, test=False):
     CLASS_INDEX = 1
     if g.shape[CLASS_INDEX] > 1:
         losses = [losses_fn(g[:,idx:idx+1,:,:], x[:,idx:idx+1,:,:]) for idx in range(g.shape[CLASS_INDEX])]
-        return [sum(i)/float(g.shape[CLASS_INDEX]) for i in zip(*losses)]
+        return [sum(i) for i in zip(*losses)] # /float(g.shape[CLASS_INDEX]) Using sum loss for now
     
     if isinstance(x, list):
         bce_loss = binary_cross_entropy_list(x, g)
@@ -210,20 +214,27 @@ def losses_fn(x, g, composite_set_theory=False, test=False):
         k = 1 # background weight
         dice, generalized_dice, twersky_dice, focal_dice = classification_dice_loss(x, g, factor=10, background_weight=k)
     
-    whole_body_g, whole_body_p = g[:,0:1,...], x[:,0:1,...]
-    ventral_side_g, ventral_side_p = g[:,1:2,...], x[:,1:2,...]
-    dorsal_side_g, dorsal_side_p = g[:,2:3,...], x[:,2:3,...]
-
-#    ventral_side_negative_loss = sum(list(losses_fn(ventral_side_g, whole_body_p * ventral_side_p)))
-#    dorsal_side_negative_loss = sum(list(losses_fn(dorsal_side_g, whole_body_p * dorsal_side_p)))
+    return_losses = [ce_loss, bce_loss, fl_loss, dice, generalized_dice, twersky_dice, focal_dice]
     
-    # Ignoring positive loss for further ablations
-#    ventral_side_positive_loss = sum(list(losses_fn(whole_body_g, \
-#                                    (whole_body_p * (1 - ventral_side_p) + (whole_body_p * ventral_side_p + ventral_side_p)*0.5))
-#    dorsal_side_positive_loss = sum(list(losses_fn(whole_body_g, \
-#                                    (whole_body_p * (1 - dorsal_side_p) + (whole_body_p * dorsal_side_p + dorsal_side_p)*0.5))
+    if composite_set_theory:
+        
+        whole_body_g, whole_body_p = g[:,0:1,...], x[:,0:1,...]
+        ventral_side_g, ventral_side_p = g[:,1:2,...], x[:,1:2,...]
+        dorsal_side_g, dorsal_side_p = g[:,2:3,...], x[:,2:3,...]
 
-    return ce_loss, bce_loss, fl_loss, dice, generalized_dice, twersky_dice, focal_dice
+        ventral_side_negative_loss = sum(list(losses_fn(ventral_side_g, whole_body_p * ventral_side_p)))
+        dorsal_side_negative_loss = sum(list(losses_fn(dorsal_side_g, whole_body_p * dorsal_side_p)))
+        
+#        # Ignoring positive loss for further ablations
+#        ventral_side_positive_loss = sum(list(losses_fn(whole_body_g, \
+#                                        (whole_body_p * (1 - ventral_side_p) + (whole_body_p * ventral_side_p + ventral_side_p)*0.5))))
+#        dorsal_side_positive_loss = sum(list(losses_fn(whole_body_g, \
+#                                        (whole_body_p * (1 - dorsal_side_p) + (whole_body_p * dorsal_side_p + dorsal_side_p)*0.5))))
+    
+        return_losses = [x+y for x,y in zip(return_losses, ventral_side_negative_loss)]
+        return_losses = [x+y for x,y in zip(return_losses, dorsal_side_negative_loss)]
+
+    return return_losses
 
 def load_recent_model(saved_dir, net, epoch=None):
     # Load model from a particular epoch and train like the rest of the epochs are relevant anyway
