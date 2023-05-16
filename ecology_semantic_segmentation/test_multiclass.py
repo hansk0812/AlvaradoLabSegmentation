@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 from .dataset.fish import fish_test_dataset, ORGANS
 from .dataset.visualize_composite_labels import display_composite_annotations
 
-from .train_multiclass import vgg_unet
+from .train_multiclass import unet_model 
 from .train_multiclass import load_recent_model
 
 from .loss_functions import cross_entropy_loss, dice_loss
@@ -103,9 +103,9 @@ if __name__ == "__main__":
     test_dataloader = DataLoader(fish_test_dataset, shuffle=False, batch_size=batch_size, num_workers=0)
  
     if torch.cuda.is_available():
-        net = vgg_unet.cuda()
+        net = unet_model.cuda()
     else:
-        net = vgg_unet
+        net = unet_model
 
     print ("Using batch size: %d" % batch_size)
     models_dir = args.models_dir

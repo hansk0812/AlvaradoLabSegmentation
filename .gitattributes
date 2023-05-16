@@ -21,3 +21,5 @@ segmentation_models/multiclass/wholebody_ventralside_dorsalside/deeplabv3plus/ch
 segmentation_models/multiclass/wholebody_ventralside_dorsalside/deeplabv3plus/channels256/img256/deeplabv3_test_results_epoch500.zip filter=lfs diff=lfs merge=lfs -text
 segmentation_models/multiclass/wholebody_ventralside_dorsalside/deeplabv3plus/channels256/img256/deeplabv3plus_best_model_epoch350.pt filter=lfs diff=lfs merge=lfs -text
 segmentation_models/multiclass/wholebody_ventralside_dorsalside/deeplabv3plus/channels256/img256/deeplabv3plus_best_model_epoch500.pt filter=lfs diff=lfs merge=lfs -text
+segmentation_models/multiclass/wholebody_ventralside_dorsalside/deeplabv3plus/channels256/img256/deeplabv3plus_best_model_epoch1210.pt filter=lfs diff=lfs merge=lfs -text
+segmentation_models/multiclass/wholebody_ventralside_dorsalside/deeplabv3plus/channels256/img256/deeplabv3_test_results_epoch1210.zip filter=lfs diff=lfs merge=lfs -text
