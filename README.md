@@ -18,15 +18,10 @@ Using U-Net models from `segmentation_models_pytorch`
   SUIM - semantic segmentation with >1 fish per image
   Deep Fish - fish_tray_images - Accurately labeled sharp masks - Semantic segmentation with >1 fish per image
 
-##### Available Pre-trained Backbones (`git lfs` based):
-Note: Use git mv when moving lfs tracked files
-
-###### Single organ models
+##### Available Pre-trained Backbones:
   Resnet34
   Resnet50
   DeepLabv3Plus
-###### Multiclass organ models
-  DeepLabv3Plus - `whole_body, ventral_side, dorsal_side`
 
 #### Training script:
 
