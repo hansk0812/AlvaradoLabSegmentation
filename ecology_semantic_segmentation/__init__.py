@@ -15,7 +15,10 @@ except Exception:
     traceback.print_exc()
 
 from .dataset.fish import fish_train_dataset, fish_val_dataset, fish_test_dataset
+
+#TODO: Change model name across all train_ and test_files
 from .model import vgg_unet
+unet_model = vgg_unet
 
 import torch
 binary_cross_entropy = torch.nn.BCEWithLogitsLoss()

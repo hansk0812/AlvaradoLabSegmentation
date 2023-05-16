@@ -1,42 +1,31 @@
-import argparse
-
 import os
-try:
-    IMGSIZE = os.environ("IMGSIZE")
-except Exception:
-    IMGSIZE = 256
-try:
-    MAXCHANNELS = os.environ("IMGSIZE")
-except Exception:
-    MAXCHANNELS = 256
-
-EXPT_NAME = "deeplabv3"
+import argparse
 
 import glob
 import traceback
 
-#from . import fish_train_dataset, fish_val_dataset, fish_test_dataset
-from .dataset.fish import SAMPLE_DATASET, IMG_SIZE, ORGANS
-from .dataset.fish.fish_dataset import FishDataset, FishSubsetDataset
-fish_train_dataset = FishDataset(dataset_type=["segmentation/composite"], 
-                                 img_shape=IMG_SIZE, 
-                                 sample_dataset=SAMPLE_DATASET,
-                                 deepsupervision=False,
-                                 organs=ORGANS)
-print ("train dataset: %d images" % len(fish_train_dataset))
+from . import fish_train_dataset, fish_val_dataset, fish_test_dataset
+from .dataset.fish import ORGANS, IMGSIZE, MAXCHANNELS, EXPTNAME
+#from .dataset.fish.fish_dataset import FishDataset, FishSubsetDataset
+#fish_train_dataset = FishDataset(dataset_type=["segmentation/composite"], 
+#                                 img_shape=IMG_SIZE, 
+#                                 sample_dataset=SAMPLE_DATASET,
+#                                 deepsupervision=False,
+#                                 organs=ORGANS)
+#print ("train dataset: %d images" % len(fish_train_dataset))
+#
+#fish_val_datasets, val_cumsum_lengths, \
+#fish_test_datasets, test_cumsum_lengths = fish_train_dataset.return_val_test_datasets()
+#
+#fish_val_dataset = FishSubsetDataset(fish_val_datasets, val_cumsum_lengths, deepsupervision=False) 
+#[dataset.dataset.set_augment_flag(False) for dataset in fish_val_dataset.datasets]
+#print ("val dataset: %d images" % len(fish_val_dataset))
+#
+#fish_test_dataset = FishSubsetDataset(fish_test_datasets, test_cumsum_lengths, deepsupervision=False) 
+#[dataset.dataset.set_augment_flag(False) for dataset in fish_test_dataset.datasets]
+#print ("test dataset: %d images" % len(fish_test_dataset))
 
-fish_val_datasets, val_cumsum_lengths, \
-fish_test_datasets, test_cumsum_lengths = fish_train_dataset.return_val_test_datasets()
-
-fish_val_dataset = FishSubsetDataset(fish_val_datasets, val_cumsum_lengths, deepsupervision=False) 
-[dataset.dataset.set_augment_flag(False) for dataset in fish_val_dataset.datasets]
-print ("val dataset: %d images" % len(fish_val_dataset))
-
-fish_test_dataset = FishSubsetDataset(fish_test_datasets, test_cumsum_lengths, deepsupervision=False) 
-[dataset.dataset.set_augment_flag(False) for dataset in fish_test_dataset.datasets]
-print ("test dataset: %d images" % len(fish_test_dataset))
-
-from . import vgg_unet
+from . import unet_model
 from .loss_functions import cross_entropy_loss, focal_loss, classification_dice_loss
 from .loss_functions import cross_entropy_list, binary_cross_entropy_list, focal_list, classification_dice_list
 
@@ -90,6 +79,10 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             optimizer.zero_grad()
 
             # forward + backward + optimize
+
+            # Found ValueError: Expected more than 1 value per channel when training 
+            assert inputs.shape[0] != 1, "Found last batch with 1 example only, change batch size multiplier!"
+
             outputs = net(inputs)
             outputs = F.sigmoid(outputs)
 
@@ -99,11 +92,17 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             ce_l, bce_l, fl_l, dice, generalized_dice, twersky_dice, focal_dice = losses_fn(outputs, labels)
             dice_l = [dice, generalized_dice, twersky_dice, focal_dice]
             
+            #TODO: Future work
+            # background dice losses
+            _, _, _, bg_dice, bg_generalized_dice, bg_twersky_dice, bg_focal_dice = losses_fn(1-outputs, 1-labels)
+            k = 1
+            dice_l = [dice_l[0] + k*bg_dice, dice_l[1] + k*bg_generalized_dice, dice_l[2] + k*bg_twersky_dice, dice_l[3] + k*bg_focal_dice]
+            
             # focal_dice works great with DeepLabv3 but doesn't as much with resnet34 or resnet50
 
             #loss =  dice + generalized_dice + twersky_dice + focal_dice
             #loss = dice + generalized_dice + twersky_dice + bce_l
-            loss =  focal_dice + generalized_dice # focal_dice #ce_l + fl_l + sum(dice_l)
+            loss = focal_dice + generalized_dice + k * (bg_focal_dice + bg_generalized_dice) # focal_dice #ce_l + fl_l + sum(dice_l)
             loss.backward()
             optimizer.step()
 
@@ -122,7 +121,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                 
                 if epoch % 10 == 0:
                     torch.save(net.state_dict(), os.path.join(save_dir, "channels%d" % MAXCHANNELS, 
-                                "img%d" % IMGSIZE,"%s_epoch%d.pt" % (EXPT_NAME, epoch)))
+                                "img%d" % IMGSIZE,"%s_epoch%d.pt" % (EXPTNAME, epoch)))
 
                 print("Epoch: %d ; Batch: %d/%d : Training Loss: %.8f" % (epoch+1, i+1, len(traindataloader), running_loss / log_every))
                 print ("\t Cross-Entropy: %0.8f; BCE: %.8f; Focal Loss: %0.8f; Dice Loss: %0.8f [D: %.8f, GD: %.8f, TwD: %.8f, FocD: %.8f]" % (
@@ -207,8 +206,10 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
 
     print('finished training')
 
-def losses_fn(x, g):
+def losses_fn(x, g, composite_set_theory=False):
     
+    # Hardcoded subset membership loss for each composite set of organs
+
     CLASS_INDEX = 1
     if g.shape[CLASS_INDEX] > 1:
         losses = [losses_fn(g[:,idx:idx+1,:,:], x[:,idx:idx+1,:,:]) for idx in range(g.shape[CLASS_INDEX])]
@@ -223,6 +224,19 @@ def losses_fn(x, g):
         ce_loss, fl_loss = cross_entropy_loss(x, g, bce=False), focal_loss(x, g, factor=1)
         dice, generalized_dice, twersky_dice, focal_dice = classification_dice_loss(x, g, factor=10)
     
+    whole_body_g, whole_body_p = g[:,0:1,...], x[:,0:1,...]
+    ventral_side_g, ventral_side_p = g[:,1:2,...], x[:,1:2,...]
+    dorsal_side_g, dorsal_side_p = g[:,2:3,...], x[:,2:3,...]
+
+#    ventral_side_negative_loss = sum(list(losses_fn(ventral_side_g, whole_body_p * ventral_side_p)))
+#    dorsal_side_negative_loss = sum(list(losses_fn(dorsal_side_g, whole_body_p * dorsal_side_p)))
+    
+    # Ignoring positive loss for further ablations
+#    ventral_side_positive_loss = sum(list(losses_fn(whole_body_g, \
+#                                    (whole_body_p * (1 - ventral_side_p) + (whole_body_p * ventral_side_p + ventral_side_p)*0.5))
+#    dorsal_side_positive_loss = sum(list(losses_fn(whole_body_g, \
+#                                    (whole_body_p * (1 - dorsal_side_p) + (whole_body_p * dorsal_side_p + dorsal_side_p)*0.5))
+
     return ce_loss, bce_loss, fl_loss, dice, generalized_dice, twersky_dice, focal_dice
 
 def load_recent_model(saved_dir, net, epoch=None):
@@ -231,10 +245,10 @@ def load_recent_model(saved_dir, net, epoch=None):
 
     try:
         gl = glob.glob(os.path.join(saved_dir, "channels%d" % MAXCHANNELS, 
-                            "img%d" % IMGSIZE, "%s*"%EXPT_NAME))
+                            "img%d" % IMGSIZE, "%s*"%EXPTNAME))
         
         epochs_list = [int(x.split("epoch")[-1].split('.')[0]) for x in gl] 
-        latest_index = np.argmax(epochs_list) 
+        latest_index = np.argmax(epochs_list)
         if epoch is None:
             index = latest_index
         else:
@@ -250,17 +264,14 @@ def load_recent_model(saved_dir, net, epoch=None):
         print ("Used latest model file: %s" % model_file)
         net.load_state_dict(load_state)
         
-        if epoch is None:
-            return start_epoch
-        else:
-            return latest_index + 1
-    
+        return start_epoch
+
     except Exception:
         traceback.print_exc()
         return -1
 
 import segmentation_models_pytorch as smp
-#vgg_unet = smp.Unet(
+#unet_model = smp.Unet(
 #            encoder_name="resnet50",        # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
 #            encoder_weights="imagenet",     # use `imagenet` pre-trained weights for encoder initialization
 #            in_channels=3,                  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
@@ -269,12 +280,12 @@ import segmentation_models_pytorch as smp
 #        )
 
 #TODO: Layer normalization
-vgg_unet = smp.DeepLabV3Plus(
+unet_model = smp.DeepLabV3Plus(
             encoder_name="resnet34",        # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
             encoder_weights="imagenet",     # use `imagenet` pre-trained weights for encoder initialization
             in_channels=3,                  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
             classes=len(ORGANS),                      # model output channels (number of classes in your dataset)
-            #activation="silu"
+            #activation="prelu"
         )
 
 if __name__ == "__main__":
@@ -299,19 +310,19 @@ if __name__ == "__main__":
                                     worker_init_fn=worker_init_fn)
     val_dataloader = DataLoader(fish_val_dataset, shuffle=False, batch_size=1, num_workers=1)
     
-    model_dir = EXPT_NAME + "/"
+    model_dir = EXPTNAME + "/"
     saved_dir = "models/"+model_dir
     if not os.path.isdir(saved_dir):
         os.makedirs(saved_dir)
 
-    start_epoch = load_recent_model(saved_dir, vgg_unet, epoch=None if args.start_epoch==0 else args.start_epoch)
+    start_epoch = load_recent_model(saved_dir, unet_model, epoch=None if args.start_epoch==0 else args.start_epoch)
     
     if torch.cuda.is_available():
-        vgg_unet = vgg_unet.cuda()
+        unet_model = unet_model.cuda()
     
-    optimizer = optim.Adam(vgg_unet.parameters(), lr=0.00003)
-    #optimizer = optim.SGD(vgg_unet.parameters(), lr=0.001, momentum=0.9)
+    optimizer = optim.Adam(unet_model.parameters(), lr=0.00001)
+    #optimizer = optim.SGD(unet_model.parameters(), lr=0.001, momentum=0.9)
     
-    train(vgg_unet, train_dataloader, val_dataloader, losses_fn, optimizer, save_dir=saved_dir, start_epoch=start_epoch, 
+    train(unet_model, train_dataloader, val_dataloader, losses_fn, optimizer, save_dir=saved_dir, start_epoch=start_epoch, 
             log_every = len(train_dataloader) // 5)
 
