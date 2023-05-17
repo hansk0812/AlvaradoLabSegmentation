@@ -58,7 +58,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
     if not os.path.isdir(os.path.join(save_dir, "channels%d" % MAXCHANNELS, "img%d" % IMGSIZE)):
         os.makedirs(os.path.join(save_dir, "channels%d" % MAXCHANNELS, "img%d" % IMGSIZE))
 
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.75, patience=30, verbose=True) 
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 500)
+    #scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.75, patience=30, verbose=True) 
     
     for epoch in range(start_epoch+1, num_epochs):  # loop over the dataset multiple times
 
