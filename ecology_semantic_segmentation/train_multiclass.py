@@ -215,6 +215,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
 def losses_fn(x, g, composite_set_theory=False, background_weight=0):
     
     # Hardcoded subset membership loss for each composite set of organs
+    # [whole_body, ventral_side, dorsal_side] = [1.         0.20878016 0.22319692] 
+    # Use dataset.get_relative_ratios for every organ subset
 
     CLASS_INDEX = 1
     if g.shape[CLASS_INDEX] > 1:
@@ -247,9 +249,9 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0):
 #                                        (whole_body_p * (1 - ventral_side_p) + (whole_body_p * ventral_side_p + ventral_side_p)*0.5))))
 #        dorsal_side_positive_loss = sum(list(losses_fn(whole_body_g, \
 #                                        (whole_body_p * (1 - dorsal_side_p) + (whole_body_p * dorsal_side_p + dorsal_side_p)*0.5))))
-    
-        return_losses = [x+y for x,y in zip(return_losses, ventral_side_negative_loss)]
-        return_losses = [x+y for x,y in zip(return_losses, dorsal_side_negative_loss)]
+   
+        return_losses = [x + 4.789727146487483 * y for x,y in zip(return_losses, ventral_side_negative_loss)]
+        return_losses = [x + 4.480348563949717 * y for x,y in zip(return_losses, dorsal_side_negative_loss)]
 
     return return_losses
 
