@@ -31,6 +31,26 @@ torchcpu_to_opencv = lambda img: (img.numpy().transpose((1,2,0))*255).astype(np.
 
 def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, start_epoch, num_epochs=5000, log_every=100):
     
+    background_keys = [0, int(1.6 * num_epochs//5), int(1.8 * num_epochs//5)]
+    background_weight = {0: 0, num_epochs//5: 0.3, int(1.6 * num_epochs//5): 0.5, int(1.8 * num_epochs//5): 1}
+    # sine bg
+    binary_flag = False
+    for epoch_cycle in range(2*num_epochs//5, num_epochs, 100):
+        if binary_flag:
+            background_weight[epoch_cycle] = 1 - np.random.rand()
+        else:
+            background_weight[epoch_cycle] = 1 + 0.5*np.random.rand()
+        background_keys.append(epoch_cycle)
+        binary_flag = not binary_flag
+    def find_background_weight(x):
+        for idx, b in enumerate(background_keys): 
+            if b>x: 
+                bg_w = background_weight[background_keys[idx-1]]
+                print ("."*50, "\n\tUsing background weight: %0.3f\n" % bg_w, '.'*50+'\n')
+
+                return bg_w
+                
+
     net = net.train()
     if not os.path.isdir("val_images"):
         os.mkdir("val_images")
@@ -75,7 +95,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             if isinstance(outputs, tuple):
                 outputs = [outputs[0]] + outputs[1]
             
-            ce_l, bce_l, fl_l, dice, generalized_dice, twersky_dice, focal_dice = losses_fn(outputs, labels)
+            ce_l, bce_l, fl_l, dice, generalized_dice, twersky_dice, focal_dice = \
+                    losses_fn(outputs, labels, composite_set_theory=True, background_weight=find_background_weight(epoch+1))
             dice_l = [dice, generalized_dice, twersky_dice, focal_dice]
             
             # focal_dice works great with DeepLabv3 but doesn't as much with resnet34 or resnet50
@@ -190,7 +211,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
 
     print('finished training')
 
-def losses_fn(x, g, composite_set_theory=False, test=False):
+def losses_fn(x, g, composite_set_theory=False, background_weight=0):
     
     # Hardcoded subset membership loss for each composite set of organs
 
@@ -204,15 +225,10 @@ def losses_fn(x, g, composite_set_theory=False, test=False):
         ce_loss, fl_loss = cross_entropy_list(x, g), focal_list(x, g, factor=1e-5)
         dice, generalized_dice, twersky_dice, focal_dice = classification_dice_list(x, g, factor=10)
     else: 
-        
-        if test:
-            return dice_loss(x, g)
+        bce_loss = cross_entropy_loss(x, g, bce=True, background_weight=background_weight)
+        ce_loss, fl_loss = cross_entropy_loss(x, g, bce=False, background_weight=background_weight), focal_loss(x, g, factor=1, background_weight=background_weight)
 
-        bce_loss = cross_entropy_loss(x, g, bce=True)
-        ce_loss, fl_loss = cross_entropy_loss(x, g, bce=False), focal_loss(x, g, factor=1)
-
-        k = 1 # background weight
-        dice, generalized_dice, twersky_dice, focal_dice = classification_dice_loss(x, g, factor=10, background_weight=k)
+        dice, generalized_dice, twersky_dice, focal_dice = classification_dice_loss(x, g, factor=10, background_weight=background_weight)
     
     return_losses = [ce_loss, bce_loss, fl_loss, dice, generalized_dice, twersky_dice, focal_dice]
     
