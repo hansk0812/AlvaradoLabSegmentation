@@ -34,6 +34,8 @@ class FishDataset(Dataset):
 
         assert all([x in DATASET_TYPES for x in dataset_type]), ",".join([x + str(x in DATASET_TYPES) for x in dataset_type])
         
+        self.organs = organs
+
         self.folder_path = datasets_metadata["folder_path"] 
         datasets = datasets_metadata["datasets"] 
        
@@ -112,6 +114,18 @@ class FishDataset(Dataset):
         return self.val_datasets, val_cumsum_lengths, \
                self.test_datasets, test_cumsum_lengths
 
+    def get_relative_ratios(self):
+
+        ratios = [0 for _ in range(len(self.organs))]
+        for _, segment, _ in self:
+            for organ_index in range(segment.shape[-3]):
+                gt = segment[organ_index]
+                ratios[organ_index] += np.sum(gt)
+        ratios = np.array(ratios) / len(self)
+        ratios /= np.max(ratios)
+        
+        return ratios
+
     def __len__(self):
         return self.dataset_cumsum_lengths[-1]
 
@@ -187,6 +201,9 @@ if __name__ == "__main__":
     valdataset = FishSubsetDataset(val_datasets, val_cumsum_lengths) 
     print ("val dataset: %d images" % len(valdataset))
     
+    print (dataset.get_relative_ratios())
+    exit()
+
     for img, seg, fname in dataset:
         img = img.transpose((1,2,0))*255 
         cv2.imshow("f", img.astype(np.uint8))
