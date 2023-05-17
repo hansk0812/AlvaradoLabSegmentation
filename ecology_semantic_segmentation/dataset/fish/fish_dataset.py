@@ -192,7 +192,7 @@ if __name__ == "__main__":
     ap.add_argument("--visualize", default="alvaradolab", help="Flag to visualize composite labels")
     args = ap.parse_args()
 
-    dataset = FishDataset(dataset_type=["segmentation/composite"], sample_dataset=True, organs=["whole_body", "ventral_side", "dorsal_side"]) #"segmentation", 
+    dataset = FishDataset(dataset_type=["segmentation/composite"], sample_dataset=False, organs=["whole_body", "ventral_side", "dorsal_side"]) #"segmentation", 
     print ("train dataset: %d images" % len(dataset))
 
     val_datasets, val_cumsum_lengths, \
