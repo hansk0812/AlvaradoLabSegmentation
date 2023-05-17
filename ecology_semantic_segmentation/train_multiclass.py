@@ -204,7 +204,10 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             num_avg = float(len(valdataloader)*val_inputs.shape[0])
             val_running_loss /= float(num_avg)
 
-        scheduler.step(val_running_loss)
+        if isinstance(scheduler, torch.optim.lr_scheduler.CosineAnnealingWarmRestarts):
+            scheduler.step(epoch + 1)
+        else:
+            scheduler.step(val_running_loss)
 
         print("\nVal Loss: %.8f!" % val_running_loss)
 #        print ("\t Cross-Entropy: %0.8f; BCE: %.8f; Focal Loss: %0.8f; Dice Loss: %0.8f [D: %.8f, GD: %.8f, TwD: %.8f, FocD: %.8f]" % (
