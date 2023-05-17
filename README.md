@@ -31,6 +31,8 @@ Using batch sizes as multiples of 9 gives most efficient use of GPU space
 `ORGANS=whole_body,ventral_side,dorsal_side python -m ecology_semantic_segmentation.train_multiclass --batch_size 54`
 `python -m ecology_semantic_segmentation.train --batch_size 54`
 
+Learning Rate Scheduling for Adam: 0.0003 to start, re-define for every checkpoint resume manually using script parameter 
+
 #### Testing Script:
 
 Uses Dice score for accuracy
