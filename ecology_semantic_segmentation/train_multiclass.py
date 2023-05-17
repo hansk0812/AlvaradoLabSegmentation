@@ -46,7 +46,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
         for idx, b in enumerate(background_keys): 
             if b>x: 
                 bg_w = background_weight[background_keys[idx-1]]
-                print ("."*50, "\n\tUsing background weight: %0.3f\n" % bg_w, '.'*50+'\n')
+                if x % 99 == 0:
+                    print ("."*50, "\n\tUsing background weight: %0.3f\n" % bg_w, '.'*50+'\n')
 
                 return bg_w
                 
