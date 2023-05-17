@@ -309,6 +309,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--batch_size", default=7, type=int, help="Multiples of 9 give the best GPU utilization (~2023)")
     ap.add_argument("--start_epoch", default=0, type=int, help="Start training from a known model for a conceptual optimization landscape")
+    ap.add_argument("--lr", default=0.0003, type=float, help="Start training based on amount of predictions>0")
     args = ap.parse_args()
 
    # Training script
@@ -333,7 +334,7 @@ if __name__ == "__main__":
     if torch.cuda.is_available():
         unet_model = unet_model.cuda()
     
-    optimizer = optim.Adam(unet_model.parameters(), lr=0.00001)
+    optimizer = optim.Adam(unet_model.parameters(), lr=args.lr)
     #optimizer = optim.SGD(unet_model.parameters(), lr=0.001, momentum=0.9)
     
     train(unet_model, train_dataloader, val_dataloader, losses_fn, optimizer, save_dir=saved_dir, start_epoch=start_epoch, 
