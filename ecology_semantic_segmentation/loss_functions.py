@@ -82,9 +82,11 @@ def twersky_loss(gt, pred, alpha=0.5, beta=0.3, background_weight=0):
     tl_n = torch.sum(gt * pred) 
     tl_d = torch.sum(gt * pred) + alpha * torch.sum((1-pred)*gt) + beta * torch.sum(pred*(1-gt))
     td_fg = - (tl_n + 1e-7) / (tl_d + 1e-7)
-
-    tl_bg_n = torch.sum((1-gt) * (1-pred)) 
-    tl_bg_d = torch.sum((1-gt) * (1-pred)) + alpha * torch.sum(pred*(1-gt)) + beta * torch.sum((1-pred)*gt)
+    
+    gt = 1-gt
+    pred = 1-pred
+    tl_bg_n = torch.sum((gt) * (pred)) 
+    tl_bg_d = torch.sum((gt) * (pred)) + alpha * torch.sum((1-pred)*(gt)) + beta * torch.sum(pred*(1-gt))
     td_bg = - (tl_bg_n + 1e-7) / (tl_bg_d + 1e-7)
 
     return td_fg + background_weight * td_bg

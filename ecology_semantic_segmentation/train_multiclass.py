@@ -42,15 +42,14 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             background_weight[epoch_cycle] = 1 + 0.5*np.random.rand()
         background_keys.append(epoch_cycle)
         binary_flag = not binary_flag
+    
     def find_background_weight(x):
         for idx, b in enumerate(background_keys): 
             if b>x: 
                 bg_w = background_weight[background_keys[idx-1]]
                 if x % 99 == 0:
                     print ("."*50, "\n\tUsing background weight: %0.3f\n" % bg_w, '.'*50+'\n')
-
                 return bg_w
-                
 
     net = net.train()
     if not os.path.isdir("val_images"):
@@ -97,8 +96,9 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             if isinstance(outputs, tuple):
                 outputs = [outputs[0]] + outputs[1]
             
+            bg_weight = find_background_weight(epoch+1)
             ce_l, bce_l, fl_l, dice, generalized_dice, twersky_dice, focal_dice = \
-                    losses_fn(outputs, labels, composite_set_theory=True, background_weight=find_background_weight(epoch+1))
+                    losses_fn(outputs, labels, composite_set_theory=True, background_weight=bg_weight)
             dice_l = [dice, generalized_dice, twersky_dice, focal_dice]
             
             # focal_dice works great with DeepLabv3 but doesn't as much with resnet34 or resnet50
