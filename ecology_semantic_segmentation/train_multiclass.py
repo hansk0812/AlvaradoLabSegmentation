@@ -45,6 +45,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
     
     def find_background_weight(x):
         for idx, b in enumerate(background_keys): 
+            if x == 0:
+                return 0
             if b>x: 
                 bg_w = background_weight[background_keys[idx-1]]
                 if x % 99 == 0:
