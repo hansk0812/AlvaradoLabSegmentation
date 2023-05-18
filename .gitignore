@@ -1,4 +1,5 @@
 models/
+segmentation_models/
 log.txt
 val_images/
 */gray/gray*

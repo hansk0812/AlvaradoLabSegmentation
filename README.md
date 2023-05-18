@@ -23,6 +23,8 @@ Using U-Net models from `segmentation_models_pytorch`
   Resnet50
   DeepLabv3Plus
 
+Link to trained models: https://drive.google.com/drive/folders/1jrUJtpxR8WvUf3td9nWXMIEdPmsgK_gp?usp=share_link
+
 #### Training script:
 
 Use `SAMPLE=1`, `SAMPLE=0`, `IMG_SIZE=256`, `ORGANS="whole_body"` flags to control training and debugging training code
