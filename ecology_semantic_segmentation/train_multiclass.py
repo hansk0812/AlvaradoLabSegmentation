@@ -37,9 +37,11 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
     binary_flag = False
     for epoch_cycle in range(2*num_epochs//5, num_epochs, 100):
         if binary_flag:
-            background_weight[epoch_cycle] = 1 - np.random.rand()
+            # without the 0.5 factor, the parameter is too large for subsets to benefit from custom loss
+            background_weight[epoch_cycle] = 0.5*(1 - np.random.rand())
         else:
-            background_weight[epoch_cycle] = 1 + 0.5*np.random.rand()
+            # without the 0.5 factor, the parameter is too large for subsets to benefit from custom loss
+            background_weight[epoch_cycle] = 0.5*(1 + 0.5*np.random.rand())
         background_keys.append(epoch_cycle)
         binary_flag = not binary_flag
     
