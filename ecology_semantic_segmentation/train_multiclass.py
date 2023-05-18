@@ -254,8 +254,10 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0):
 #        dorsal_side_positive_loss = sum(list(losses_fn(whole_body_g, \
 #                                        (whole_body_p * (1 - dorsal_side_p) + (whole_body_p * dorsal_side_p + dorsal_side_p)*0.5))))
    
-        return_losses = [x + 4.789727146487483 * y for x,y in zip(return_losses, ventral_side_negative_loss)]
-        return_losses = [x + 4.480348563949717 * y for x,y in zip(return_losses, dorsal_side_negative_loss)]
+        return_losses = [x + y for x,y in zip(return_losses, ventral_side_negative_loss)] 
+        # x + 4.789727146487483 * y Subsets creating gaps in whole_body segment
+        return_losses = [x + y for x,y in zip(return_losses, dorsal_side_negative_loss)]
+        # x + 4.480348563949717 * y Subsets creating gaps in whole_body segment
 
     return return_losses
 
