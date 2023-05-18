@@ -63,6 +63,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
     for epoch in range(start_epoch+1, num_epochs):  # loop over the dataset multiple times
 
         [dataset.dataset.set_augment_flag(True) for dataset in traindataloader.dataset.datasets]
+        bg_weight = find_background_weight(epoch+1)
         
         running_loss, ce_t, bce_t, fl_t, dice_t = 0.0, 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0]
         for i, data in enumerate(traindataloader, 0):
@@ -96,7 +97,6 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             if isinstance(outputs, tuple):
                 outputs = [outputs[0]] + outputs[1]
             
-            bg_weight = find_background_weight(epoch+1)
             ce_l, bce_l, fl_l, dice, generalized_dice, twersky_dice, focal_dice = \
                     losses_fn(outputs, labels, composite_set_theory=True, background_weight=bg_weight)
             dice_l = [dice, generalized_dice, twersky_dice, focal_dice]
@@ -245,6 +245,9 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0):
         ventral_side_g, ventral_side_p = g[:,1:2,...], x[:,1:2,...]
         dorsal_side_g, dorsal_side_p = g[:,2:3,...], x[:,2:3,...]
 
+        ventral_side_w = 4.789727146487483
+        dorsal_side_w = 4.480348563949717
+        
         ventral_side_negative_loss = sum(list(losses_fn(ventral_side_g, whole_body_p * ventral_side_p)))
         dorsal_side_negative_loss = sum(list(losses_fn(dorsal_side_g, whole_body_p * dorsal_side_p)))
         
@@ -253,10 +256,13 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0):
 #                                        (whole_body_p * (1 - ventral_side_p) + (whole_body_p * ventral_side_p + ventral_side_p)*0.5))))
 #        dorsal_side_positive_loss = sum(list(losses_fn(whole_body_g, \
 #                                        (whole_body_p * (1 - dorsal_side_p) + (whole_body_p * dorsal_side_p + dorsal_side_p)*0.5))))
-   
-        return_losses = [x + y for x,y in zip(return_losses, ventral_side_negative_loss)] 
+
+        deviation = 1 - 0.5 * np.random.rand()
+        return_losses = [x + ventral_side_w * deviation * y \
+                for x,y in zip(return_losses, ventral_side_negative_loss)] 
         # x + 4.789727146487483 * y Subsets creating gaps in whole_body segment
-        return_losses = [x + y for x,y in zip(return_losses, dorsal_side_negative_loss)]
+        return_losses = [x + dorsal_side_w * deviation * y \
+                for x,y in zip(return_losses, dorsal_side_negative_loss)]
         # x + 4.480348563949717 * y Subsets creating gaps in whole_body segment
 
     return return_losses
