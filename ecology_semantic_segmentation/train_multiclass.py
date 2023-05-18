@@ -32,7 +32,7 @@ torchcpu_to_opencv = lambda img: (img.numpy().transpose((1,2,0))*255).astype(np.
 def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, start_epoch, num_epochs=5000, log_every=100):
     
     background_keys = [0, int(1.6 * num_epochs//5), int(1.8 * num_epochs//5)]
-    background_weight = {0: 0, num_epochs//5: 0.3, int(1.6 * num_epochs//5): 0.5, int(1.8 * num_epochs//5): 1}
+    background_weight = {0: 0, num_epochs//5: 0.3, int(1.6 * num_epochs//5): 0.5, int(1.8 * num_epochs//5): 0.7}
     # sine bg
     binary_flag = False
     for epoch_cycle in range(2*num_epochs//5, num_epochs, 100):
