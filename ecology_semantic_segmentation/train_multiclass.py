@@ -267,8 +267,11 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0):
         return_losses2 = [x + dorsal_side_w * y \
                 for x,y in zip(return_losses, dorsal_side_negative_loss)]
         # x + 4.480348563949717 * y Subsets creating gaps in whole_body segment
+        
+        return_losses = [x + y \
+                for x,y in zip(return_losses1, return_losses2)]
 
-    return return_losses1 + return_losses2
+    return return_losses
 
 def load_recent_model(saved_dir, net, epoch=None):
     # Load model from a particular epoch and train like the rest of the epochs are relevant anyway
