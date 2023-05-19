@@ -109,7 +109,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
 
             #loss =  dice + generalized_dice + twersky_dice + focal_dice
             #loss = dice + generalized_dice + twersky_dice + bce_l
-            loss = twersky_dice + bce_l #focal_dice + 
+            loss = generalized_dice + focal_dice + bce_l #focal_dice + 
             # Chose generalized_dice with k for correctness' sake when focal_dice_bg was giving good variation 
             # + k * (bg_focal_dice + bg_generalized_dice)
             
@@ -243,7 +243,8 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0):
     
     return_losses = [ce_loss, bce_loss, fl_loss, dice, generalized_dice, twersky_dice, focal_dice]
     
-    if composite_set_theory:
+    # ignore subset losses 20% of the training to prevent subsets dominating superset shapes
+    if composite_set_theory and np.random.rand() < 0.2:
         
         whole_body_g, whole_body_p = g[:,0:1,...], x[:,0:1,...]
         ventral_side_g, ventral_side_p = g[:,1:2,...], x[:,1:2,...]
