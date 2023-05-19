@@ -37,11 +37,11 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
     binary_flag = False
     for epoch_cycle in range(2*num_epochs//5, num_epochs, 100):
         if binary_flag:
-            # without the 0.5 factor, the parameter is too large for subsets to benefit from custom loss
-            background_weight[epoch_cycle] = 0.5*(1 - np.random.rand())
+            # without the 0.75 factor, the parameter is too large for subsets to benefit from custom loss
+            background_weight[epoch_cycle] = 0.3 + (0.2*np.random.rand()) #0.75*(1 - np.random.rand())
         else:
             # without the 0.5 factor, the parameter is too large for subsets to benefit from custom loss
-            background_weight[epoch_cycle] = 0.5*(1 + 0.5*np.random.rand())
+            background_weight[epoch_cycle] = 0.7 - (0.3*np.random.rand()) #0.75*(1 + 0.5*np.random.rand())
         background_keys.append(epoch_cycle)
         binary_flag = not binary_flag
     
@@ -61,8 +61,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
     if not os.path.isdir(os.path.join(save_dir, "channels%d" % MAXCHANNELS, "img%d" % IMGSIZE)):
         os.makedirs(os.path.join(save_dir, "channels%d" % MAXCHANNELS, "img%d" % IMGSIZE))
 
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 500)
-    #scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.75, patience=30, verbose=True) 
+    #scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 500)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.75, patience=30, verbose=True) 
     
     for epoch in range(start_epoch+1, num_epochs):  # loop over the dataset multiple times
 
@@ -109,7 +109,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
 
             #loss =  dice + generalized_dice + twersky_dice + focal_dice
             #loss = dice + generalized_dice + twersky_dice + bce_l
-            loss = focal_dice + generalized_dice 
+            loss = twersky_dice + bce_l #focal_dice + 
             # Chose generalized_dice with k for correctness' sake when focal_dice_bg was giving good variation 
             # + k * (bg_focal_dice + bg_generalized_dice)
             
@@ -261,15 +261,14 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0):
 #        dorsal_side_positive_loss = sum(list(losses_fn(whole_body_g, \
 #                                        (whole_body_p * (1 - dorsal_side_p) + (whole_body_p * dorsal_side_p + dorsal_side_p)*0.5))))
 
-        deviation = 1 - 0.5 * np.random.rand()
-        return_losses = [x + ventral_side_w * deviation * y \
+        return_losses1 = [x + ventral_side_w * y \
                 for x,y in zip(return_losses, ventral_side_negative_loss)] 
         # x + 4.789727146487483 * y Subsets creating gaps in whole_body segment
-        return_losses = [x + dorsal_side_w * deviation * y \
+        return_losses2 = [x + dorsal_side_w * y \
                 for x,y in zip(return_losses, dorsal_side_negative_loss)]
         # x + 4.480348563949717 * y Subsets creating gaps in whole_body segment
 
-    return return_losses
+    return return_losses1 + return_losses2
 
 def load_recent_model(saved_dir, net, epoch=None):
     # Load model from a particular epoch and train like the rest of the epochs are relevant anyway
