@@ -102,7 +102,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                 outputs = [outputs[0]] + outputs[1]
             
             ce_l, bce_l, fl_l, dice, generalized_dice, twersky_dice, focal_dice = \
-                    losses_fn(outputs, labels, composite_set_theory=True, background_weight=bg_weight)
+                    losses_fn(outputs, labels, composite_set_theory=False, background_weight=bg_weight)
             dice_l = [dice, generalized_dice, twersky_dice, focal_dice]
             
             # focal_dice works great with DeepLabv3 but doesn't as much with resnet34 or resnet50
@@ -244,7 +244,7 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0):
     return_losses = [ce_loss, bce_loss, fl_loss, dice, generalized_dice, twersky_dice, focal_dice]
     
     # ignore subset losses 20% of the training to prevent subsets dominating superset shapes
-    if composite_set_theory and np.random.rand() < 0.2:
+    if composite_set_theory and np.random.rand() > 0.2:
         
         whole_body_g, whole_body_p = g[:,0:1,...], x[:,0:1,...]
         ventral_side_g, ventral_side_p = g[:,1:2,...], x[:,1:2,...]
