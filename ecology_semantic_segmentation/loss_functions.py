@@ -51,11 +51,11 @@ def dice_loss(gt, pred, generalized=False, background_weight = 1):
 
     if not generalized:
         dl_n = 2 * torch.sum(gt * pred)
-        dl_d = torch.sum(gt * gt + pred * pred)
+        dl_d = torch.sum(gt + pred * pred) # gt * gt = gt
         dice_fg = (dl_n + 1e-7) / (dl_d + 1e-7) 
         
         dl_bg_n = 2 * torch.sum((1-gt)*(1-pred))
-        dl_bg_d = 2 * torch.sum((1-gt)*(1-gt) + (1-pred)*(1-pred))
+        dl_bg_d = 2 * torch.sum((1-gt) + (1-pred)*(1-pred)) # 1-gt * 1-gt = 1-gt
         dice_bg = (dl_bg_n + 1e-7) / (dl_bg_d + 1e-7) 
 
         return - dice_fg - background_weight * dice_bg
@@ -68,11 +68,11 @@ def dice_loss(gt, pred, generalized=False, background_weight = 1):
         G0, P0 = (1-gt), (1-pred)
 
         dice_coeff_preds_fg = torch.sum(G1 * P1) + 1e-7
-        dice_coeff_normalize_fg = torch.sum(G1*G1 + P1*P1) + 1e-7
+        dice_coeff_normalize_fg = torch.sum(G1 + P1*P1) + 1e-7 # G1*G1 = G1
         dc = (dice_coeff_preds_fg / dice_coeff_normalize_fg) 
 
         dice_coeff_preds_bg = torch.sum(G0 * P0) + 1e-7
-        dice_coeff_normalize_bg = torch.sum(G0*G0 + P0*P0) + 1e-7
+        dice_coeff_normalize_bg = torch.sum(G0 + P0*P0) + 1e-7 # G0*G0 = G0
         dc += background_weight * (dice_coeff_preds_bg / dice_coeff_normalize_bg)
         
         return - dc
@@ -85,8 +85,8 @@ def twersky_loss(gt, pred, alpha=0.5, beta=0.3, background_weight=0):
     
     gt = 1-gt
     pred = 1-pred
-    tl_bg_n = torch.sum((gt) * (pred)) 
-    tl_bg_d = torch.sum((gt) * (pred)) + alpha * torch.sum((1-pred)*(gt)) + beta * torch.sum(pred*(1-gt))
+    tl_bg_n = torch.sum(gt * pred) 
+    tl_bg_d = torch.sum(gt * pred) + alpha * torch.sum((1-pred)*(gt)) + beta * torch.sum(pred*(1-gt))
     td_bg = - (tl_bg_n + 1e-7) / (tl_bg_d + 1e-7)
 
     return td_fg + background_weight * td_bg
@@ -94,12 +94,12 @@ def twersky_loss(gt, pred, alpha=0.5, beta=0.3, background_weight=0):
 def focal_dice_coefficient(gt, pred, alpha=0.5, beta=0.3, gamma=1.8, background_weight=0):
 
     dl_n = 2 * torch.sum(gt * pred)
-    dl_d = torch.sum(gt * gt + pred * pred)
+    dl_d = torch.sum(gt + pred * pred) # gt * gt = gt
     dice_coeff_fg = (dl_n + 1e-7) / (dl_d + 1e-7)
     fg_dice = - torch.pow(1-dice_coeff_fg, gamma) * torch.log(dice_coeff_fg + 1e-7)
 
     dl_bg_n = 2 * torch.sum((1-gt) * (1-pred))
-    dl_bg_d = torch.sum((1-gt) * (1-gt) + (1-pred) * (1-pred))
+    dl_bg_d = torch.sum((1-gt) + (1-pred) * (1-pred)) # 1-gt * 1-gt
     dice_coeff_bg = (dl_bg_n + 1e-7) / (dl_bg_d + 1e-7)
     bg_dice = - torch.pow(1-dice_coeff_bg, gamma) * torch.log(dice_coeff_bg + 1e-7)
 
