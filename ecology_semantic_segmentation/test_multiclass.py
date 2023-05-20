@@ -26,7 +26,7 @@ def tensor_to_cv2(img_batch):
 
     return img_batch
 
-def test(net, dataloader, models_dir="models/vgg", results_dir="test_results/", batch_size=1, saved_epoch=-1):
+def test(net, dataloader, models_dir="models/vgg", results_dir="test_results/", batch_size=1, saved_epoch=-1, single_model=False):
     
     test_dice = [[0 for _ in range(len(ORGANS))], 0]
     label_dirs = ORGANS
@@ -62,25 +62,26 @@ def test(net, dataloader, models_dir="models/vgg", results_dir="test_results/", 
                                 for idx in range(test_labels.shape[CLASS_INDEX])]
                 
                 test_dice = [[x - l for x, l in zip(test_dice[0], loss)], test_dice[1]+1]
-
-            if torch.cuda.is_available():
-                test_images = test_images.cpu()
-                test_labels = test_labels.cpu()
-                test_outputs = test_outputs.cpu()
-
-            test_images = (test_images.numpy() * 255).astype(np.uint8)
-            test_labels = (test_labels.numpy() * 255).astype(np.uint8)
-            test_outputs = (test_outputs.numpy() * 255).astype(np.uint8)
-
-            preds = display_composite_annotations(test_images[0], test_outputs[0], ORGANS, return_image=True, verbose=False)
-            gts = display_composite_annotations(test_images[0], test_labels[0], ORGANS, return_image=True, verbose=False)
             
-            img_keys = [list(x.keys())[0] for x in gts]
+            if args.single_model:
+                if torch.cuda.is_available():
+                    test_images = test_images.cpu()
+                    test_labels = test_labels.cpu()
+                    test_outputs = test_outputs.cpu()
 
-            for idx, key in enumerate(img_keys):
+                test_images = (test_images.numpy() * 255).astype(np.uint8)
+                test_labels = (test_labels.numpy() * 255).astype(np.uint8)
+                test_outputs = (test_outputs.numpy() * 255).astype(np.uint8)
 
-                cv2.imwrite(os.path.join(dir_name, key+"_%d_gt.png" % j), gts[idx][key])
-                cv2.imwrite(os.path.join(dir_name, key+"_%d_pred.png" % j), preds[idx][key])
+                preds = display_composite_annotations(test_images[0], test_outputs[0], ORGANS, return_image=True, verbose=False)
+                gts = display_composite_annotations(test_images[0], test_labels[0], ORGANS, return_image=True, verbose=False)
+                
+                img_keys = [list(x.keys())[0] for x in gts]
+
+                for idx, key in enumerate(img_keys):
+
+                    cv2.imwrite(os.path.join(dir_name, key+"_%d_gt.png" % j), gts[idx][key])
+                    cv2.imwrite(os.path.join(dir_name, key+"_%d_pred.png" % j), preds[idx][key])
         
         dice_loss_val = torch.tensor(test_dice[0]) / float(test_dice[1])
         print ("Epoch %d: \n\t Test Dice Score: " % saved_epoch, dice_loss_val)
@@ -135,7 +136,8 @@ if __name__ == "__main__":
             continue
 
         with torch.no_grad():
-            dice_loss_val = test(net, test_dataloader, models_dir=models_dir, batch_size=batch_size, saved_epoch=saved_epoch)
+            dice_loss_val = test(net, test_dataloader, models_dir=models_dir, batch_size=batch_size, \
+                                saved_epoch=saved_epoch, single_model=bool(args.single_model))
             if dice_loss_val is None:
                 continue
 
