@@ -91,14 +91,14 @@ def test(net, dataloader, models_dir="models/vgg", results_dir="test_results/", 
 
 if __name__ == "__main__":
     
-    batch_size = 1
-
     import argparse
     ap = argparse.ArgumentParser()
     ap.add_argument("--single_model", type=int, help="Epoch number for model selection vs testing entire test set", default=None)
     ap.add_argument("--models_dir", default="models/vgg", help="Flag for model selection vs testing entire test set")
     args = ap.parse_args()
     
+    batch_size = 1 if args.single_model else 45
+
     [x.dataset.set_augment_flag(False) for x in fish_test_dataset.datasets]
     test_dataloader = DataLoader(fish_test_dataset, shuffle=False, batch_size=batch_size, num_workers=0)
  
