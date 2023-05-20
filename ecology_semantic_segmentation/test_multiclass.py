@@ -28,7 +28,7 @@ def tensor_to_cv2(img_batch):
 
 def test(net, dataloader, models_dir="models/vgg", results_dir="test_results/", batch_size=1, saved_epoch=-1):
     
-    test_dice = [0, 0]
+    test_dice = [[0 for _ in range(len(ORGANS))], 0]
     label_dirs = ORGANS
     
     dir_name = os.path.join(results_dir, "%s"%str(saved_epoch).zfill(4), ",".join(label_dirs))
@@ -58,10 +58,10 @@ def test(net, dataloader, models_dir="models/vgg", results_dir="test_results/", 
 
             CLASS_INDEX = 1
             if test_labels.shape[CLASS_INDEX] > 1:
-                loss = sum([dice_loss(test_outputs[:,idx:idx+1,:,:], test_labels[:,idx:idx+1,:,:]) \
-                                for idx in range(test_labels.shape[CLASS_INDEX])]) / float(test_labels.shape[CLASS_INDEX])
+                loss = [dice_loss(test_outputs[:,idx:idx+1,:,:], test_labels[:,idx:idx+1,:,:], background_weight=0) \
+                                for idx in range(test_labels.shape[CLASS_INDEX])]
                 
-                test_dice = [test_dice[0] - loss, test_dice[1]+1]
+                test_dice = [[x - l for x, l in zip(test_dice[0], loss)], test_dice[1]+1]
 
             if torch.cuda.is_available():
                 test_images = test_images.cpu()
@@ -82,9 +82,8 @@ def test(net, dataloader, models_dir="models/vgg", results_dir="test_results/", 
                 cv2.imwrite(os.path.join(dir_name, key+"_%d_gt.png" % j), gts[idx][key])
                 cv2.imwrite(os.path.join(dir_name, key+"_%d_pred.png" % j), preds[idx][key])
         
-        dice_loss_val = test_dice[0] / float(test_dice[1])
-        print ("Epoch %d: \n\t Test Dice Score: %.5f" % (
-            saved_epoch, dice_loss_val))
+        dice_loss_val = torch.tensor(test_dice[0]) / float(test_dice[1])
+        print ("Epoch %d: \n\t Test Dice Score: " % saved_epoch, dice_loss_val)
         print('Finished Testing')
 
         return dice_loss_val
@@ -141,6 +140,7 @@ if __name__ == "__main__":
                 continue
 
             test_losses.append([saved_epoch, dice_loss_val])
-
-    for loss in sorted(test_losses, key = lambda x: x[1]):
-        print ("Epoch %d : DICE Score %.10f" % (loss[0], loss[1]))
+    
+    for organ_idx in range(len(ORGANS)):
+        for loss in sorted(test_losses, key = lambda x: x[1][organ_idx]):
+            print ("Epoch %d : Organ : %s DICE Score " % (loss[0], ORGANS[organ_idx]), loss[1][organ_idx])
