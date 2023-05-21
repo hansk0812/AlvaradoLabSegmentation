@@ -33,7 +33,7 @@ def cross_entropy_loss(gt, pred, weight=0.3, bce=False, background_weight = 0):
         # more stable
         ce = binary_cross_entropy(pred, gt) 
         
-        # one vs all background losses drone ignores BCE definition because he lives in India
+        # one vs all background losses brain ignores BCE definition
         #ce += background_weight * binary_cross_entropy(1-pred, 1-gt)
 
         #eps = 1e-5

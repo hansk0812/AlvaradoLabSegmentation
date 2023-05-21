@@ -97,10 +97,10 @@ if __name__ == "__main__":
     ap.add_argument("--models_dir", default="models/vgg", help="Flag for model selection vs testing entire test set")
     args = ap.parse_args()
     
-    batch_size = 1 if args.single_model else 45
+    batch_size = 1 if not torch.cuda.is_available() or args.single_model else 45
 
     [x.dataset.set_augment_flag(False) for x in fish_test_dataset.datasets]
-    test_dataloader = DataLoader(fish_test_dataset, shuffle=False, batch_size=batch_size, num_workers=0)
+    test_dataloader = DataLoader(fish_test_dataset, shuffle=False, batch_size=batch_size, num_workers=6)
  
     if torch.cuda.is_available():
         net = unet_model.cuda()
