@@ -60,15 +60,26 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
         os.mkdir("val_images")
     if not os.path.isdir(os.path.join(save_dir, "channels%d" % MAXCHANNELS, "img%d" % IMGSIZE)):
         os.makedirs(os.path.join(save_dir, "channels%d" % MAXCHANNELS, "img%d" % IMGSIZE))
-
-    #scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 500)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.75, patience=30, verbose=True) 
+    
+    # #TODO: cosine annealing needs more analysis into the epoch parameter 
+    #scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 100)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.75, patience=50, verbose=True) 
     
     for epoch in range(start_epoch+1, num_epochs):  # loop over the dataset multiple times
 
         [dataset.dataset.set_augment_flag(True) for dataset in traindataloader.dataset.datasets]
         bg_weight = find_background_weight(epoch+1)
         
+        # loss curriculum
+        generalized_dice_w = int(epoch<1000) + int(epoch<2500 and epoch>1500)
+        generalized_dice_w = int(generalized_dice_w>0)
+
+        focal_dice_w = int(epoch>2000) + int(generalized_dice_w!=1 or (epoch>2000 and epoch<2500))
+        focal_dice_w = int(focal_dice_w>0)
+        
+        bce_l_w = int(epoch<2000)
+        fl_l_w = int(epoch>1200 and epoch<2000)
+       
         running_loss, ce_t, bce_t, fl_t, dice_t = 0.0, 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0]
         for i, data in enumerate(traindataloader, 0):
             # get the inputs; data is a list of [inputs, labels]
@@ -106,10 +117,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             dice_l = [dice, generalized_dice, twersky_dice, focal_dice]
             
             # focal_dice works great with DeepLabv3 but doesn't as much with resnet34 or resnet50
-
-            #loss =  dice + generalized_dice + twersky_dice + focal_dice
-            #loss = dice + generalized_dice + twersky_dice + bce_l
-            loss = generalized_dice + focal_dice + bce_l #focal_dice + 
+            
+            loss = focal_dice_w * focal_dice + bce_l_w * bce_l + generalized_dice_w * generalized_dice
             # Chose generalized_dice with k for correctness' sake when focal_dice_bg was giving good variation 
             # + k * (bg_focal_dice + bg_generalized_dice)
             
@@ -243,8 +252,7 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0):
     
     return_losses = [ce_loss, bce_loss, fl_loss, dice, generalized_dice, twersky_dice, focal_dice]
     
-    # ignore subset losses 20% of the training to prevent subsets dominating superset shapes
-    if composite_set_theory and np.random.rand() > 0.2:
+    if composite_set_theory:
         
         whole_body_g, whole_body_p = g[:,0:1,...], x[:,0:1,...]
         ventral_side_g, ventral_side_p = g[:,1:2,...], x[:,1:2,...]
@@ -256,17 +264,17 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0):
         ventral_side_negative_loss = sum(list(losses_fn(ventral_side_g, whole_body_p * ventral_side_p)))
         dorsal_side_negative_loss = sum(list(losses_fn(dorsal_side_g, whole_body_p * dorsal_side_p)))
         
-#        # Ignoring positive loss for further ablations
-#        ventral_side_positive_loss = sum(list(losses_fn(whole_body_g, \
-#                                        (whole_body_p * (1 - ventral_side_p) + (whole_body_p * ventral_side_p + ventral_side_p)*0.5))))
-#        dorsal_side_positive_loss = sum(list(losses_fn(whole_body_g, \
-#                                        (whole_body_p * (1 - dorsal_side_p) + (whole_body_p * dorsal_side_p + dorsal_side_p)*0.5))))
+        # Ignoring positive loss for further ablations
+        ventral_side_positive_loss = sum(list(losses_fn(whole_body_g, \
+                                        (whole_body_p * (1 - ventral_side_p) + (whole_body_p * ventral_side_p + ventral_side_p)*0.5))))
+        dorsal_side_positive_loss = sum(list(losses_fn(whole_body_g, \
+                                        (whole_body_p * (1 - dorsal_side_p) + (whole_body_p * dorsal_side_p + dorsal_side_p)*0.5))))
 
-        return_losses1 = [x + ventral_side_w * y \
-                for x,y in zip(return_losses, ventral_side_negative_loss)] 
+        return_losses1 = [x + ventral_side_w * (y+z) \
+                for x,y in zip(return_losses, ventral_side_negative_loss, ventral_side_positive_loss)] 
         # x + 4.789727146487483 * y Subsets creating gaps in whole_body segment
-        return_losses2 = [x + dorsal_side_w * y \
-                for x,y in zip(return_losses, dorsal_side_negative_loss)]
+        return_losses2 = [x + dorsal_side_w * (y+z) \
+                for x,y in zip(return_losses, dorsal_side_negative_loss, ventral_side_positive_loss)]
         # x + 4.480348563949717 * y Subsets creating gaps in whole_body segment
         
         return_losses = [x + y \
