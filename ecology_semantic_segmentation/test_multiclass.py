@@ -1,4 +1,5 @@
 # Testing
+
 import glob
 import os
 import cv2
@@ -56,12 +57,30 @@ def test(net, dataloader, models_dir="models/vgg", results_dir="test_results/", 
             
             test_outputs = F.sigmoid(net(test_images))
 
-            CLASS_INDEX = 1
-            if test_labels.shape[CLASS_INDEX] > 1:
-                loss = [dice_loss(test_outputs[:,idx:idx+1,:,:], test_labels[:,idx:idx+1,:,:], background_weight=0) \
-                                for idx in range(test_labels.shape[CLASS_INDEX])]
+            #TODO: Beam search to determine over-expression: per-model hyperparameter vs accuracy!
+            # Adding union and intersection losses created the need for this test! 
+            # Ignored for other models before ablation and deleted because of lack of space
+            # Will not be included for performance benchmarks but a similarity in the pattern can be expected
+            BEAM_SEARCH_THRESHOLDS = np.arange(0.8, 0.99, step=0.01)
+            if args.single_model:
+                avg_losses = []
+                for threshold in BEAM_SEARCH_THRESHOLDS
+                    test_outputs[test_outputs] > BEAM_SEARCH_THRESHOLD] = 1
+                    test_outputs[test_outputs!=1] = 0
+
+                    CLASS_INDEX = 1
+                    loss = [dice_loss(test_outputs[:,idx:idx+1,:,:], test_labels[:,idx:idx+1,:,:], background_weight=0) \
+                                    for idx in range(test_labels.shape[CLASS_INDEX])]
+                    avg_losses.append(loss)
+                best_idx = np.argmin(np.mean(avg_losses, axis=0))
+                print ("Best performance using threshold: %.3f" % BEAM_SEARCH_THRESHOLDS[best_idx])
+                print ("Accuracy:", avg_losses[best_idx])
                 
-                test_dice = [[x - l for x, l in zip(test_dice[0], loss)], test_dice[1]+1]
+            CLASS_INDEX = 1
+            loss = [dice_loss(test_outputs[:,idx:idx+1,:,:], test_labels[:,idx:idx+1,:,:], background_weight=0) \
+                            for idx in range(test_labels.shape[CLASS_INDEX])]
+            avg_losses.append(loss)
+            test_dice = [[x - l for x, l in zip(test_dice[0], loss)], test_dice[1]+1]
             
             if args.single_model:
                 if torch.cuda.is_available():
