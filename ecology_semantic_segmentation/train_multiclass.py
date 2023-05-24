@@ -29,7 +29,7 @@ from torch.utils.data import DataLoader
 
 torchcpu_to_opencv = lambda img: (img.numpy().transpose((1,2,0))*255).astype(np.uint8)
 
-def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, start_epoch, num_epochs=5000, log_every=100):
+def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, start_epoch, num_epochs=5000, log_every=100, early_stop_epoch=500):
     
     background_keys = [0, int(1.6 * num_epochs//5), int(1.8 * num_epochs//5)]
     background_weight = {0: 0, num_epochs//5: 0.3, int(1.6 * num_epochs//5): 0.5, int(1.8 * num_epochs//5): 0.7}
@@ -62,8 +62,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
         os.makedirs(os.path.join(save_dir, "channels%d" % MAXCHANNELS, "img%d" % IMGSIZE))
     
     # #TODO: cosine annealing needs more analysis into the epoch parameter 
-    #scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 100)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.75, patience=50, verbose=True) 
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 100)
+    #scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.75, patience=50, verbose=True) 
     
     for epoch in range(start_epoch+1, num_epochs):  # loop over the dataset multiple times
 
@@ -71,6 +71,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
         bg_weight = find_background_weight(epoch+1)
         
         # loss curriculum
+        #TODO: loss curriculum heuristics wrt early_stop_epoch
         generalized_dice_w = int(epoch<1000) + int(epoch<2500 and epoch>1500)
         generalized_dice_w = int(generalized_dice_w>0)
 
@@ -79,6 +80,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
         
         bce_l_w = int(epoch<2000)
         fl_l_w = int(epoch>1200 and epoch<2000)
+
+        random_multiclass_weight_bool = epoch>early_stop_epoch
        
         running_loss, ce_t, bce_t, fl_t, dice_t = 0.0, 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0]
         for i, data in enumerate(traindataloader, 0):
@@ -113,12 +116,13 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                 outputs = [outputs[0]] + outputs[1]
             
             ce_l, bce_l, fl_l, dice, generalized_dice, twersky_dice, focal_dice = \
-                    losses_fn(outputs, labels, composite_set_theory=False, background_weight=bg_weight)
+                    losses_fn(outputs, labels, composite_set_theory=False, 
+                            background_weight=bg_weight, early_stopped=random_multiclass_weight_bool)
             dice_l = [dice, generalized_dice, twersky_dice, focal_dice]
             
             # focal_dice works great with DeepLabv3 but doesn't as much with resnet34 or resnet50
             
-            loss = focal_dice_w * focal_dice + bce_l_w * bce_l + generalized_dice_w * generalized_dice
+            loss = focal_dice_w * focal_dice + bce_l_w * bce_l + generalized_dice_w * generalized_dice + twersky_dice
             # Chose generalized_dice with k for correctness' sake when focal_dice_bg was giving good variation 
             # + k * (bg_focal_dice + bg_generalized_dice)
             
@@ -229,7 +233,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
 
     print('finished training')
 
-def losses_fn(x, g, composite_set_theory=False, background_weight=0):
+def losses_fn(x, g, composite_set_theory=False, background_weight=0, early_stopped=False):
     
     # Hardcoded subset membership loss for each composite set of organs
     # [whole_body, ventral_side, dorsal_side] = [1.         0.20878016 0.22319692] 
@@ -257,9 +261,9 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0):
         whole_body_g, whole_body_p = g[:,0:1,...], x[:,0:1,...]
         ventral_side_g, ventral_side_p = g[:,1:2,...], x[:,1:2,...]
         dorsal_side_g, dorsal_side_p = g[:,2:3,...], x[:,2:3,...]
-
-        ventral_side_w = 4.789727146487483
-        dorsal_side_w = 4.480348563949717
+        
+        ventral_side_w = 4.789727146487483 * (1 - int(early_stopped) * np.random.choice([0,1]) * np.random.rand())
+        dorsal_side_w = 4.480348563949717 * (1 - int(early_stopped) * np.random.choice([0,1]) * np.random.rand())
         
         ventral_side_negative_loss = sum(list(losses_fn(ventral_side_g, whole_body_p * ventral_side_p)))
         dorsal_side_negative_loss = sum(list(losses_fn(dorsal_side_g, whole_body_p * dorsal_side_p)))
