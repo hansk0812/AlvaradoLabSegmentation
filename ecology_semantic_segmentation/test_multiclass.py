@@ -64,8 +64,8 @@ def test(net, dataloader, models_dir="models/vgg", results_dir="test_results/", 
             BEAM_SEARCH_THRESHOLDS = np.arange(0.8, 0.99, step=0.01)
             if args.single_model:
                 avg_losses = []
-                for threshold in BEAM_SEARCH_THRESHOLDS
-                    test_outputs[test_outputs] > BEAM_SEARCH_THRESHOLD] = 1
+                for threshold in BEAM_SEARCH_THRESHOLDS:
+                    test_outputs[test_outputs > BEAM_SEARCH_THRESHOLD] = 1
                     test_outputs[test_outputs!=1] = 0
 
                     CLASS_INDEX = 1
@@ -79,7 +79,6 @@ def test(net, dataloader, models_dir="models/vgg", results_dir="test_results/", 
             CLASS_INDEX = 1
             loss = [dice_loss(test_outputs[:,idx:idx+1,:,:], test_labels[:,idx:idx+1,:,:], background_weight=0) \
                             for idx in range(test_labels.shape[CLASS_INDEX])]
-            avg_losses.append(loss)
             test_dice = [[x - l for x, l in zip(test_dice[0], loss)], test_dice[1]+1]
             
             if args.single_model:
