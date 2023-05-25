@@ -29,6 +29,7 @@ from torch.utils.data import DataLoader
 
 torchcpu_to_opencv = lambda img: (img.numpy().transpose((1,2,0))*255).astype(np.uint8)
 
+# #TODO: Idea: Impose GT on prediction and compute loss without GT of subset for superset learning
 def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, start_epoch, num_epochs=5000, log_every=100, early_stop_epoch=500):
     
     background_keys = [0, int(1.6 * num_epochs//5), int(1.8 * num_epochs//5)]
@@ -72,6 +73,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
         
         # loss curriculum
         #TODO: loss curriculum heuristics wrt early_stop_epoch
+        # loss curriculum gave minimal changes in performance when regularized losses were used!
         generalized_dice_w = int(epoch<1000) + int(epoch<2500 and epoch>1500)
         generalized_dice_w = int(generalized_dice_w>0)
 
@@ -122,7 +124,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             
             # focal_dice works great with DeepLabv3 but doesn't as much with resnet34 or resnet50
             
-            loss = focal_dice_w * focal_dice + bce_l_w * bce_l + generalized_dice_w * generalized_dice + twersky_dice
+            loss = generalized_dice # focal_dice_w * focal_dice + bce_l_w * bce_l + generalized_dice_w * generalized_dice + twersky_dice
             # Chose generalized_dice with k for correctness' sake when focal_dice_bg was giving good variation 
             # + k * (bg_focal_dice + bg_generalized_dice)
             
