@@ -126,7 +126,13 @@ if __name__ == "__main__":
         net = unet_model
 
     print ("Using batch size: %d" % batch_size)
-    models_dir = args.models_dir
+
+    try:
+        exp_models = os.environ["EXPTNAME"]
+        models_dir = os.path.join("models", exp_models)
+    except Exception:
+        models_dir = args.models_dir
+    
     channels=256
     img=256
 
