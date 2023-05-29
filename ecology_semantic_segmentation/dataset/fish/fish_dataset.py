@@ -130,7 +130,7 @@ class FishDataset(Dataset):
         return self.dataset_cumsum_lengths[-1]
     
     def return_descending_order_sets(self, img, ann):
-        # Preferred order: easiest to segment organ as ann[0] --> hardest to segment as ann[-1]
+        # Preferred order: easiest to segment organ as ann[-1] --> hardest to segment as ann[0]
         for idx in range(ann.shape[0]-1):
             ann[idx] = sum(x for x in ann[idx+1:])
         ann[ann>1] = 1
