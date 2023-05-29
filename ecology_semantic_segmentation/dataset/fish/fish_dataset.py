@@ -129,11 +129,18 @@ class FishDataset(Dataset):
     def __len__(self):
         return self.dataset_cumsum_lengths[-1]
     
-    def return_descending_order_sets(self, img, ann):
+    def return_union_sets_descending_order(self, ann, exclude_indices=[0]):
+        # exclude_indices: Eliminate composite segmentation unions to prevent learning the same segment
         # Preferred order: easiest to segment organ as ann[-1] --> hardest to segment as ann[0]
+        # GT label ordering dependent: env variable: 
+        #ORGANS needs sequence relevant ordering based on hardest-to-segment organs
+
         for idx in range(ann.shape[0]-1):
-            ann[idx] = sum(x for x in ann[idx+1:])
+            if idx in exclude_indices:
+                continue
+            ann[idx] = sum(x for x in ann[idx:])
         ann[ann>1] = 1
+        
         return ann
 
     def __getitem__(self, idx):
@@ -198,8 +205,10 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--visualize", default="alvaradolab", help="Flag to visualize composite labels")
     args = ap.parse_args()
+    
+    organs = os.environ["ORGANS"].split(',')
 
-    dataset = FishDataset(dataset_type=["segmentation/composite"], sample_dataset=False, organs=["whole_body", "ventral_side", "dorsal_side"]) #"segmentation", 
+    dataset = FishDataset(dataset_type=["segmentation/composite"], sample_dataset=True, organs=organs) #"segmentation", 
     print ("train dataset: %d images" % len(dataset))
 
     val_datasets, val_cumsum_lengths, \
@@ -209,10 +218,12 @@ if __name__ == "__main__":
     print ("val dataset: %d images" % len(valdataset))
     
     print (dataset.get_relative_ratios())
-    exit()
 
     for img, seg, fname in dataset:
         img = img.transpose((1,2,0))*255 
+        
+        seg = dataset.return_union_sets_descending_order(seg)
+
         cv2.imshow("f", img.astype(np.uint8))
         cv2.imshow("g", (seg[0]*255).astype(np.uint8))
         cv2.imshow("h", (seg[1]*255).astype(np.uint8))
