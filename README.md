@@ -39,3 +39,5 @@ Learning Rate Scheduling for Adam: 0.0003 to start, re-define for every checkpoi
 
 Uses Dice score for accuracy
 `python -m ecology_semantic_segmentation.test --models <MODELDIR>`
+
+#TODO: DEEPSUPERVISION CODE!
