@@ -30,6 +30,10 @@ def tensor_to_cv2(img_batch):
 def test(net, dataloader, models_dir="models/vgg", results_dir="test_results/", batch_size=1, saved_epoch=-1, single_model=False):
     
     test_dice = [[0 for _ in range(len(ORGANS))], 0]
+    
+    BEAM_SEARCH_THRESHOLDS = np.arange(0.8, 0.99, step=0.03)
+    test_dice_beam = [[[0 for _ in range(len(ORGANS))] for _ in range(len(BEAM_SEARCH_THRESHOLDS))], 0]
+    
     label_dirs = ORGANS
     
     dir_name = os.path.join(results_dir, "%s"%str(saved_epoch).zfill(4), ",".join(label_dirs))
@@ -61,21 +65,26 @@ def test(net, dataloader, models_dir="models/vgg", results_dir="test_results/", 
             # Adding union and intersection losses created the need for this test! 
             # Ignored for other models before ablation and deleted because of lack of space
             # Will not be included for performance benchmarks but a similarity in the pattern can be expected
-            BEAM_SEARCH_THRESHOLDS = np.arange(0.8, 0.99, step=0.01)
             if args.single_model:
-                avg_losses = []
+                test_outputs_backup = test_outputs.detach().clone()
                 for threshold in BEAM_SEARCH_THRESHOLDS:
-                    test_outputs[test_outputs > BEAM_SEARCH_THRESHOLD] = 1
+                    test_outputs[test_outputs > threshold] = 1
                     test_outputs[test_outputs!=1] = 0
 
                     CLASS_INDEX = 1
                     loss = [dice_loss(test_outputs[:,idx:idx+1,:,:], test_labels[:,idx:idx+1,:,:], background_weight=0) \
                                     for idx in range(test_labels.shape[CLASS_INDEX])]
-                    avg_losses.append(loss)
-                best_idx = np.argmin(np.mean(avg_losses, axis=0))
-                print ("Best performance using threshold: %.3f" % BEAM_SEARCH_THRESHOLDS[best_idx])
-                print ("Accuracy:", avg_losses[best_idx])
-                
+                    test_dice_beam
+                    test_dice_beam = [[x-l for x, l in \
+                                        zip(test_dice_beam[0][idx], loss) \
+                                        for idx in range(len(BEAM_SEARCH_THRESHOLDS))], test_dice_beam[1]+1]
+
+                    test_outputs = test_outputs_backup
+
+                if torch.cuda.is_available():
+                    avg_losses = [[y.cpu().numpy() for y in x] for x in avg_losses]
+                avg_losses = np.array(avg_losses)
+
             CLASS_INDEX = 1
             loss = [dice_loss(test_outputs[:,idx:idx+1,:,:], test_labels[:,idx:idx+1,:,:], background_weight=0) \
                             for idx in range(test_labels.shape[CLASS_INDEX])]
@@ -101,6 +110,12 @@ def test(net, dataloader, models_dir="models/vgg", results_dir="test_results/", 
                     cv2.imwrite(os.path.join(dir_name, key+"_%d_gt.png" % j), gts[idx][key])
                     cv2.imwrite(os.path.join(dir_name, key+"_%d_pred.png" % j), preds[idx][key])
         
+        #best_idx = np.argmax(np.mean(-avg_losses, axis=0)) # best model based on avg across organs
+        for organ_idx in range(len(ORGANS)):
+            best_idx = np.argmax(-avg_losses[:, organ_idx]) # best model based on avg across organs
+            print ("Best performance for %s using threshold: %.3f" % (ORGANS[organ_idx], BEAM_SEARCH_THRESHOLDS[best_idx]))
+            print ("Accuracy:", -avg_losses[best_idx])
+
         dice_loss_val = torch.tensor(test_dice[0]) / float(test_dice[1])
         print ("Epoch %d: \n\t Test Dice Score: " % saved_epoch, dice_loss_val)
         print('Finished Testing')
