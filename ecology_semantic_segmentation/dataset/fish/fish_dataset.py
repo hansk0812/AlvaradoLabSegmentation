@@ -129,20 +129,6 @@ class FishDataset(Dataset):
     def __len__(self):
         return self.dataset_cumsum_lengths[-1]
     
-    def return_union_sets_descending_order(self, ann, exclude_indices=[0]):
-        # exclude_indices: Eliminate composite segmentation unions to prevent learning the same segment
-        # Preferred order: easiest to segment organ as ann[-1] --> hardest to segment as ann[0]
-        # GT label ordering dependent: env variable: 
-        #ORGANS needs sequence relevant ordering based on hardest-to-segment organs
-
-        for idx in range(ann.shape[0]-1):
-            if idx in exclude_indices:
-                continue
-            ann[idx] = sum(x for x in ann[idx:])
-        ann[ann>1] = 1
-        
-        return ann
-
     def __getitem__(self, idx):
         
         current_dataset_id = 0
@@ -222,8 +208,6 @@ if __name__ == "__main__":
     for img, seg, fname in dataset:
         img = img.transpose((1,2,0))*255 
         
-        seg = dataset.return_union_sets_descending_order(seg)
-
         cv2.imshow("f", img.astype(np.uint8))
         cv2.imshow("g", (seg[0]*255).astype(np.uint8))
         cv2.imshow("h", (seg[1]*255).astype(np.uint8))

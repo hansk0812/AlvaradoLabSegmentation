@@ -29,6 +29,21 @@ from torch.utils.data import DataLoader
 
 torchcpu_to_opencv = lambda img: (img.numpy().transpose((1,2,0))*255).astype(np.uint8)
 
+def return_union_sets_descending_order(ann, exclude_indices=[0]):
+    # exclude_indices: Eliminate composite segmentation unions to prevent learning the same segment
+    # Preferred order: easiest to segment organ as ann[-1] --> hardest to segment as ann[0]
+    # GT label ordering dependent: env variable: 
+    #ORGANS needs sequence relevant ordering based on hardest-to-segment organs
+    # Based on how the regularization made me decide to do this, this code isn't a dataset based xy pair trick
+
+    for idx in range(ann.shape[0]-1):
+        if idx in exclude_indices:
+            continue
+        ann[idx] = sum(x for x in ann[idx:])
+    ann[ann>1] = 1
+    
+    return ann
+
 # #TODO: Idea: Impose GT on prediction and compute loss without GT of subset for superset learning
 def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, start_epoch, num_epochs=5000, log_every=100, early_stop_epoch=500):
     
@@ -90,6 +105,9 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels, fname = data
             
+            # strongest in the pack segmentation only!
+            labels = return_union_sets_descending_order(labels)
+
             """
              #print (inputs.min(), inputs.max(), labels.min(), labels.max())
             img = torchcpu_to_opencv(inputs[0])
