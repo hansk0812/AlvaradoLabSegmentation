@@ -185,6 +185,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             for j, val_data in enumerate(valdataloader, 0):
                 val_inputs, val_labels, _ = val_data
                 
+                val_labels = return_union_sets_descending_order(val_labels)
+                
                 if torch.cuda.is_available():
                     if isinstance(val_labels, list):
                         val_inputs, val_labels = val_inputs.cuda(), [x.cuda() for x in val_labels]
