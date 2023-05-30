@@ -47,6 +47,10 @@ def return_union_sets_descending_order(ann, exclude_indices=[0]):
 # #TODO: Idea: Impose GT on prediction and compute loss without GT of subset for superset learning
 def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, start_epoch, num_epochs=5000, log_every=100, early_stop_epoch=500):
     
+    # Initial test for the elusive composite_set_theory flag
+    composite_flag = (len(ORGANS) > 1)
+    print ("Using composite losses: ", composite_flag)
+
     background_keys = [0, int(1.6 * num_epochs//5), int(1.8 * num_epochs//5)]
     background_weight = {0: 0, num_epochs//5: 0.3, int(1.6 * num_epochs//5): 0.5, int(1.8 * num_epochs//5): 0.7}
     # sine bg
@@ -136,7 +140,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                 outputs = [outputs[0]] + outputs[1]
             
             ce_l, bce_l, fl_l, dice, generalized_dice, twersky_dice, focal_dice = \
-                    losses_fn(outputs, labels, composite_set_theory=False, 
+                    losses_fn(outputs, labels, composite_set_theory=composite_flag, 
                             background_weight=bg_weight, early_stopped=random_multiclass_weight_bool)
             dice_l = [dice, generalized_dice, twersky_dice, focal_dice]
             
@@ -207,8 +211,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                 #fl_t += fl_l.item()
                 #dice_t = [x.item() + y for (x,y) in zip(dice_l, dice_t)]
                 
-                # save 5 images per epoch for testing
-                if j < 10:
+                # save 5 images per 10 epochs for testing
+                if j < 10 and epoch % 10 == 0:
                     
                     if not os.path.isdir(os.path.join("val_images", str(epoch))):
                         os.mkdir(os.path.join("val_images", str(epoch)))
@@ -262,6 +266,11 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0, early_stopp
     CLASS_INDEX = 1
     if g.shape[CLASS_INDEX] > 1:
         losses = [losses_fn(g[:,idx:idx+1,:,:], x[:,idx:idx+1,:,:]) for idx in range(g.shape[CLASS_INDEX])]
+
+        # direct optimization on target objective
+        # superset index 1 depending on subset 2 to get set 1 
+        losses[1] += losses_fn(g[:,1:2,:,:] - g[:,2:3,:,:], x[:,1:2,:,:] - x[:,2:3,:,:])
+        
         return [sum(i) for i in zip(*losses)] # /float(g.shape[CLASS_INDEX]) Using sum loss for now
     
     if isinstance(x, list):
@@ -279,25 +288,33 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0, early_stopp
     if composite_set_theory:
         
         whole_body_g, whole_body_p = g[:,0:1,...], x[:,0:1,...]
-        ventral_side_g, ventral_side_p = g[:,1:2,...], x[:,1:2,...]
+        ventral_union_g, ventral_union_p = g[:,1:2,...], x[:,1:2,...]
         dorsal_side_g, dorsal_side_p = g[:,2:3,...], x[:,2:3,...]
+        ventral_side_g, ventral_side_p = ventral_union_g - dorsal_side_g, ventral_union_p - dorsal_side_p 
         
-        ventral_side_w = 4.789727146487483 * (1 - int(early_stopped) * np.random.choice([0,1]) * np.random.rand())
+        ventral_union_w = 2.4376792669332903
+
+        ventral_dorsal_side_w = 4.789727146487483 * (1 - int(early_stopped) * np.random.choice([0,1]) * np.random.rand())
         dorsal_side_w = 4.480348563949717 * (1 - int(early_stopped) * np.random.choice([0,1]) * np.random.rand())
         
+        ventral_union_negative_loss = sum(list(losses_fn(ventral_union_g, whole_body_p * ventral_union_p)))
         ventral_side_negative_loss = sum(list(losses_fn(ventral_side_g, whole_body_p * ventral_side_p)))
         dorsal_side_negative_loss = sum(list(losses_fn(dorsal_side_g, whole_body_p * dorsal_side_p)))
         
+        # set overlap as 0.5 based regularizer: possible generalization to factorized pixel map (1/k for k>2)
+        ventral_union_positive_loss = sum(list(losses_fn(whole_body_g, \
+                                        (whole_body_p * (1 - ventral_union_p) + (whole_body_p * ventral_union_p + ventral_union_p)*0.5))))
         ventral_side_positive_loss = sum(list(losses_fn(whole_body_g, \
                                         (whole_body_p * (1 - ventral_side_p) + (whole_body_p * ventral_side_p + ventral_side_p)*0.5))))
         dorsal_side_positive_loss = sum(list(losses_fn(whole_body_g, \
                                         (whole_body_p * (1 - dorsal_side_p) + (whole_body_p * dorsal_side_p + dorsal_side_p)*0.5))))
 
-        return_losses1 = [x + ventral_side_w * (y+z) \
-                for x,y in zip(return_losses, ventral_side_negative_loss, ventral_side_positive_loss)] 
+        return_losses1 = [w + ventral_side_w * (y+z) + ventral_union_w * x \
+                for w,x,y,z in zip(return_losses, ventral_union_negative_loss, ventral_side_negative_loss, ventral_side_positive_loss)] 
         # x + 4.789727146487483 * y Subsets creating gaps in whole_body segment
-        return_losses2 = [x + dorsal_side_w * (y+z) \
-                for x,y in zip(return_losses, dorsal_side_negative_loss, ventral_side_positive_loss)]
+
+        return_losses2 = [w + dorsal_side_w * (y+z) + ventral_union_w * x \
+                for w,x,y,z in zip(return_losses, ventral_union_positive_loss, dorsal_side_negative_loss, ventral_side_positive_loss)]
         # x + 4.480348563949717 * y Subsets creating gaps in whole_body segment
         
         return_losses = [x + y \
