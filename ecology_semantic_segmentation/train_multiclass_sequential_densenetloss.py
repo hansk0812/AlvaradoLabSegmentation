@@ -36,10 +36,10 @@ def return_union_sets_descending_order(ann, exclude_indices=[0]):
     #ORGANS needs sequence relevant ordering based on hardest-to-segment organs
     # Based on how the regularization made me decide to do this, this code isn't a dataset based xy pair trick
 
-    for idx in range(ann.shape[0]-1):
+    for idx in range(ann.shape[1]-1):
         if idx in exclude_indices:
             continue
-        ann[idx] = sum(x for x in ann[idx:])
+        ann[:,idx] = torch.sum(ann[:,idx:], axis=1)
     ann[ann>1] = 1
     
     return ann
@@ -86,6 +86,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
     #scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.75, patience=50, verbose=True) 
     
     for epoch in range(start_epoch+1, num_epochs):  # loop over the dataset multiple times
+
+        print ("Epoch %d" % epoch)
 
         [dataset.dataset.set_augment_flag(True) for dataset in traindataloader.dataset.datasets]
         bg_weight = find_background_weight(epoch+1)
@@ -146,14 +148,19 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             
             # focal_dice works great with DeepLabv3 but doesn't as much with resnet34 or resnet50
             
-            loss = generalized_dice # focal_dice_w * focal_dice + bce_l_w * bce_l + generalized_dice_w * generalized_dice + twersky_dice
+            loss = focal_dice_w * focal_dice + bce_l_w * bce_l + generalized_dice_w * generalized_dice + twersky_dice
             # Chose generalized_dice with k for correctness' sake when focal_dice_bg was giving good variation 
             # + k * (bg_focal_dice + bg_generalized_dice)
             
             # focal_dice #ce_l + fl_l + sum(dice_l)
             loss.backward()
             optimizer.step()
-
+ 
+            if epoch % 10 == 0:
+                torch.save(net.state_dict(), os.path.join(save_dir, "channels%d" % MAXCHANNELS, 
+                            "img%d" % IMGSIZE,"%s_epoch%d.pt" % (EXPTNAME, epoch)))
+           
+            """ # Print when debugging only for faster training!
             # print statistics
             running_loss += loss.item()
             ce_t+= ce_l.item()
@@ -166,10 +173,6 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                 log_every = 1
             if len(traindataloader) < log_every or \
                i % log_every == log_every-1:    # print every log_every mini-batches
-                
-                if epoch % 10 == 0:
-                    torch.save(net.state_dict(), os.path.join(save_dir, "channels%d" % MAXCHANNELS, 
-                                "img%d" % IMGSIZE,"%s_epoch%d.pt" % (EXPTNAME, epoch)))
 
                 print("Epoch: %d ; Batch: %d/%d : Training Loss: %.8f" % (epoch+1, i+1, len(traindataloader), running_loss / log_every))
                 print ("\t Cross-Entropy: %0.8f; BCE: %.8f; Focal Loss: %0.8f; Dice Loss: %0.8f [D: %.8f, GD: %.8f, TwD: %.8f, FocD: %.8f]" % (
@@ -177,7 +180,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                             dice_t[0]/float(log_every), dice_t[1]/float(log_every), dice_t[2]/float(log_every), dice_t[3]/float(log_every)))
                 
                 running_loss, ce_t, bce_t, fl_t, dice_t = 0.0, 0.0, 0.0, 0.0, [0.0, 0.0, 0.0, 0.0]
-        
+            """
+
         [dataset.dataset.set_augment_flag(False) for dataset in valdataloader.dataset.datasets]
         with torch.no_grad():
             net = net.eval()
@@ -196,6 +200,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                 val_outputs = net(val_inputs)
                 val_outputs = F.sigmoid(val_outputs)
                 
+                """ # Ignoring logging for faster training
                 if isinstance(val_outputs, tuple):
                     val_outputs = [val_outputs[0]] + val_outputs[1]
                 
@@ -212,7 +217,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                 bce_t += bce_l.item()
                 #fl_t += fl_l.item()
                 #dice_t = [x.item() + y for (x,y) in zip(dice_l, dice_t)]
-                
+                """
+
                 # save 5 images per 10 epochs for testing
                 if j < 10 and epoch % 10 == 0:
                     
@@ -243,19 +249,23 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                         cv2.imwrite(imgpath+"_img.png", img)
                         cv2.imwrite(imgpath+"_gt_organ%d.png" % idx, gt)
                         cv2.imwrite(imgpath+"_pred_organ%d.png" % idx, out)
-
+            
+            """
             num_avg = float(len(valdataloader)*val_inputs.shape[0])
             val_running_loss /= float(num_avg)
+            """
 
         if isinstance(scheduler, torch.optim.lr_scheduler.CosineAnnealingWarmRestarts):
             scheduler.step(epoch + 1)
         else:
             scheduler.step(val_running_loss)
-
+        
+        """
         print("\nVal Loss: %.8f!" % val_running_loss)
-#        print ("\t Cross-Entropy: %0.8f; BCE: %.8f; Focal Loss: %0.8f; Dice Loss: %0.8f [D: %.8f, GD: %.8f, TwD: %.8f, FocD: %.8f]" % (
-#                    ce_t/float(num_avg), bce_t/float(num_avg), fl_t/float(num_avg), sum([x/float(num_avg) for x in dice_t]), 
-#                    dice_t[0]/float(num_avg), dice_t[1]/float(num_avg), dice_t[2]/float(num_avg), dice_t[3]/float(num_avg)))
+        print ("\t Cross-Entropy: %0.8f; BCE: %.8f; Focal Loss: %0.8f; Dice Loss: %0.8f [D: %.8f, GD: %.8f, TwD: %.8f, FocD: %.8f]" % (
+                    ce_t/float(num_avg), bce_t/float(num_avg), fl_t/float(num_avg), sum([x/float(num_avg) for x in dice_t]), 
+                    dice_t[0]/float(num_avg), dice_t[1]/float(num_avg), dice_t[2]/float(num_avg), dice_t[3]/float(num_avg)))
+        """
 
     print('finished training')
 
