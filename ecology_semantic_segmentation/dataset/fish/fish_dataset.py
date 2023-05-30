@@ -29,7 +29,7 @@ import traceback
 class FishDataset(Dataset):
 
     def __init__(self, dataset_type=["segmentation/composite"], img_shape = 256, min_segment_positivity_ratio=0.0075, 
-                 organs=["whole_body"], sample_dataset=True, deepsupervision=False): 
+                 organs=["whole_body"], sample_dataset=True, deepsupervision=False, augment_flag=True): 
         # min_segment_positivity_ratio is around 0.009 - 0.011 for eye (the smallest part)
 
         assert all([x in DATASET_TYPES for x in dataset_type]), ",".join([x + str(x in DATASET_TYPES) for x in dataset_type])
@@ -71,7 +71,7 @@ class FishDataset(Dataset):
                                                         organs = organs,
                                                         sample_dataset = sample_dataset,
                                                         bbox_dir = None, #bbox_dir)
-                                                        augment_flag = True) 
+                                                        augment_flag = augment_flag) 
                 
                 # create train, val or test sets
                 num_samples = {"train": [0, int(len(dataset) * dataset_splits["train"])]}
@@ -114,16 +114,30 @@ class FishDataset(Dataset):
         return self.val_datasets, val_cumsum_lengths, \
                self.test_datasets, test_cumsum_lengths
 
-    def get_relative_ratios(self):
+    def get_relative_ratios(self, ignore_superset=None):
 
-        ratios = [0 for _ in range(len(self.organs))]
+        ratios, ratios_union = [0 for _ in range(len(self.organs))], [0 for _ in range(len(self.organs))]
         for _, segment, _ in self:
             for organ_index in range(segment.shape[-3]):
                 gt = segment[organ_index]
+                
+                if not ignore_superset is None and \
+                       organ_index not in ignore_superset and \
+                       organ_index != segment.shape[-3]-1:
+                    gt = sum(x for x in segment[organ_index:])
+
                 ratios[organ_index] += np.sum(gt)
+                gt[gt>1] = 1
+                ratios[organ_index] += np.sum(gt)
+
         ratios = np.array(ratios) / len(self)
         ratios /= np.max(ratios)
+        ratios_union = np.array(ratios_union) / len(self)
+        ratios_union /= np.max(ratios_union)
         
+        if not ignore_superset is None:
+            return ratios, ratios_union
+
         return ratios
 
     def __len__(self):
@@ -194,7 +208,7 @@ if __name__ == "__main__":
     
     organs = os.environ["ORGANS"].split(',')
 
-    dataset = FishDataset(dataset_type=["segmentation/composite"], sample_dataset=True, organs=organs) #"segmentation", 
+    dataset = FishDataset(dataset_type=["segmentation/composite"], sample_dataset=False, organs=organs, augment_flag=False) #"segmentation", 
     print ("train dataset: %d images" % len(dataset))
 
     val_datasets, val_cumsum_lengths, \
@@ -203,7 +217,8 @@ if __name__ == "__main__":
     valdataset = FishSubsetDataset(val_datasets, val_cumsum_lengths) 
     print ("val dataset: %d images" % len(valdataset))
     
-    print (dataset.get_relative_ratios())
+    print (dataset.get_relative_ratios(ignore_superset=[0]))
+    exit()
 
     for img, seg, fname in dataset:
         img = img.transpose((1,2,0))*255 
