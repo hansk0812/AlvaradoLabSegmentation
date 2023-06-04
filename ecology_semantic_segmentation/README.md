@@ -34,7 +34,14 @@ U-Net based Semantic Segmentation
 
 ## Available organs:
 - `whole_body` single organ models
+- `ventral_side` single organ models
+- `whole_body,ventral_side,dorsal_side` multi-organ models (loss based stability study ongoing)
+- `whole_body,ventral_side,dorsal_side` superset models
+    ##### Drop in performance for ventral_side UNION dorsal_side models - suspected federated knowledge distillation
+    ##### HOPE: time doesn't make it work well
 
 ## Training specifics and model changes
 - `ecology_semantic_segmentation/train.py`
 - `ecology_semantic_segmentation/test.py`
+
+
