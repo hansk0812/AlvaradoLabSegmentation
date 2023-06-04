@@ -8,7 +8,7 @@ def display_composite_annotations(image, labels_map, composite_labels, verbose=T
         min_positivity_ratio = 0.009, hide_whole_body_segment=False, show_composite_parts=True, return_image=False):
     
     return_images = []
-    alpha = 0.8
+    alpha = 0.4
     
     image = image.transpose((1,2,0)).astype(np.uint8)
     #cv2.imshow("image", image)

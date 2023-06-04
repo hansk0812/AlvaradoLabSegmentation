@@ -61,7 +61,14 @@ def test(net, dataloader, models_dir="models/vgg", results_dir="test_results/", 
             
             # idx 0: superset - whole body
             # idx -1: easiest organ to segment
-            test_outputs = return_union_sets_descending_order(test_outputs, reverse=True)
+            test_outputs = return_union_sets_descending_order(test_outputs, reverse=True) #.cpu().numpy()
+            test_labels = test_labels #.cpu().numpy()
+            
+            # Polygon edges found on union set affecting performance!
+            for batch_idx in range(test_outputs.shape[0]):
+                for seg_idx in range(test_outputs.shape[1]):
+                    cv2.imshow(str(seg_idx), (test_outputs[batch_idx, seg_idx].cpu().numpy() * 255).astype(np.uint8))
+                cv2.waitKey()
 
             #TODO: Beam search to determine over-expression: per-model hyperparameter vs accuracy!
             # Pending
