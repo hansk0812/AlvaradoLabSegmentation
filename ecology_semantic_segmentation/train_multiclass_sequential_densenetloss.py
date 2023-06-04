@@ -31,12 +31,13 @@ torchcpu_to_opencv = lambda img: (img.numpy().transpose((1,2,0))*255).astype(np.
 
 def return_union_sets_descending_order(ann, exclude_indices=[0], reverse=False):
     # exclude_indices: Eliminate composite segmentation unions to prevent learning the same segment
-    # Preferred order: easiest to segment organ as ann[-1] --> hardest to segment as ann[0]
+    # Preferred order: easiest to segment organ as ann[-1] --> hardest to segment as ann[sorted(idx) \ exclude_indices]
     # GT label ordering dependent: env variable: 
     #ORGANS needs sequence relevant ordering based on hardest-to-segment organs
     # Based on how the regularization made me decide to do this, this code isn't a dataset based xy pair trick
     # reverse: supersets to organs
-    
+     
+    # torch polygon artefacts based on jagged edges
     if not reverse:
         for idx in range(ann.shape[1]-1):
             if idx in exclude_indices:
@@ -50,6 +51,20 @@ def return_union_sets_descending_order(ann, exclude_indices=[0], reverse=False):
             ann[:,idx] = ann[:,idx]-ann[:,idx+1]
         ann[ann>1] = 1
         ann[ann<0] = 0
+    
+#    if not reverse:
+#        for idx in range(ann.shape[1]-1):
+#            if idx in exclude_indices:
+#                continue
+#            ann[:,idx] = np.sum(ann[:,idx:], axis=1)
+#        ann[ann>1] = 1
+#    else:
+#        for idx in range(ann.shape[1]-2, -1, -1):
+#            if idx in exclude_indices:
+#                continue
+#            ann[:,idx] = ann[:,idx]-ann[:,idx+1]
+#        ann[ann>1] = 1
+#        ann[ann<0] = 0
 
     return ann
 
