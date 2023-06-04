@@ -29,30 +29,39 @@ from torch.utils.data import DataLoader
 
 torchcpu_to_opencv = lambda img: (img.numpy().transpose((1,2,0))*255).astype(np.uint8)
 
-def return_union_sets_descending_order(ann, exclude_indices=[0]):
+def return_union_sets_descending_order(ann, exclude_indices=[0], reverse=False):
     # exclude_indices: Eliminate composite segmentation unions to prevent learning the same segment
     # Preferred order: easiest to segment organ as ann[-1] --> hardest to segment as ann[0]
     # GT label ordering dependent: env variable: 
     #ORGANS needs sequence relevant ordering based on hardest-to-segment organs
     # Based on how the regularization made me decide to do this, this code isn't a dataset based xy pair trick
-
-    for idx in range(ann.shape[1]-1):
-        if idx in exclude_indices:
-            continue
-        ann[:,idx] = torch.sum(ann[:,idx:], axis=1)
-    ann[ann>1] = 1
+    # reverse: supersets to organs
     
+    if not reverse:
+        for idx in range(ann.shape[1]-1):
+            if idx in exclude_indices:
+                continue
+            ann[:,idx] = torch.sum(ann[:,idx:], axis=1)
+        ann[ann>1] = 1
+    else:
+        for idx in range(ann.shape[1]-2, -1, -1):
+            if idx in exclude_indices:
+                continue
+            ann[:,idx] = ann[:,idx]-ann[:,idx+1]
+        ann[ann>1] = 1
+        ann[ann<0] = 0
+
     return ann
 
 # #TODO: Idea: Impose GT on prediction and compute loss without GT of subset for superset learning
-def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, start_epoch, num_epochs=5000, log_every=100, early_stop_epoch=500):
+def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, start_epoch, num_epochs=5000, log_every=100, early_stop_epoch=400):
     
     # Initial test for the elusive composite_set_theory flag
     composite_flag = (len(ORGANS) > 1)
     print ("Using composite losses: ", composite_flag)
 
     background_keys = [0, int(1.6 * num_epochs//5), int(1.8 * num_epochs//5)]
-    background_weight = {0: 0, num_epochs//5: 0.3, int(1.6 * num_epochs//5): 0.5, int(1.8 * num_epochs//5): 0.7}
+    background_weight = {0: 0, num_epochs//10: 0.3, int(1.6 * num_epochs//5): 0.5, int(1.8 * num_epochs//5): 0.7}
     # sine bg
     binary_flag = False
     for epoch_cycle in range(2*num_epochs//5, num_epochs, 100):
@@ -281,7 +290,7 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0, early_stopp
 
         # direct optimization on target objective
         # superset index 1 depending on subset 2 to get set 1 
-        losses[1] += losses_fn(g[:,1:2,:,:] - g[:,2:3,:,:], x[:,1:2,:,:] - x[:,2:3,:,:])
+        losses[1] += 4 * losses_fn(g[:,1:2,:,:] - g[:,2:3,:,:], x[:,1:2,:,:] - x[:,2:3,:,:])
         
         return [sum(i) for i in zip(*losses)] # /float(g.shape[CLASS_INDEX]) Using sum loss for now
     
@@ -304,7 +313,7 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0, early_stopp
         dorsal_side_g, dorsal_side_p = g[:,2:3,...], x[:,2:3,...]
         ventral_side_g, ventral_side_p = ventral_union_g - dorsal_side_g, ventral_union_p - dorsal_side_p 
         
-        ventral_union_w = 2.4376792669332903
+        ventral_union_w = 2.4376792669332903 * (1 - int(early_stopped) * np.random.choice([0,1]) * np.random.rand())
 
         ventral_dorsal_side_w = 4.789727146487483 * (1 - int(early_stopped) * np.random.choice([0,1]) * np.random.rand())
         dorsal_side_w = 4.480348563949717 * (1 - int(early_stopped) * np.random.choice([0,1]) * np.random.rand())
@@ -314,6 +323,7 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0, early_stopp
         dorsal_side_negative_loss = sum(list(losses_fn(dorsal_side_g, whole_body_p * dorsal_side_p)))
         
         # set overlap as 0.5 based regularizer: possible generalization to factorized pixel map (1/k for k>2)
+        # Overlap contribution set as 0.5 based on 2 classes assumption: possible generalization might involve factors based on size of segment
         ventral_union_positive_loss = sum(list(losses_fn(whole_body_g, \
                                         (whole_body_p * (1 - ventral_union_p) + (whole_body_p * ventral_union_p + ventral_union_p)*0.5))))
         ventral_side_positive_loss = sum(list(losses_fn(whole_body_g, \
@@ -322,11 +332,11 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0, early_stopp
                                         (whole_body_p * (1 - dorsal_side_p) + (whole_body_p * dorsal_side_p + dorsal_side_p)*0.5))))
 
         return_losses1 = [w + ventral_side_w * (y+z) + ventral_union_w * x \
-                for w,x,y,z in zip(return_losses, ventral_union_negative_loss, ventral_side_negative_loss, ventral_side_positive_loss)] 
+                for w,x,y,z in zip(return_losses, ventral_union_negative_loss, ventral_side_negative_loss, dorsal_side_negative_loss)] 
         # x + 4.789727146487483 * y Subsets creating gaps in whole_body segment
 
         return_losses2 = [w + dorsal_side_w * (y+z) + ventral_union_w * x \
-                for w,x,y,z in zip(return_losses, ventral_union_positive_loss, dorsal_side_negative_loss, ventral_side_positive_loss)]
+                for w,x,y,z in zip(return_losses, ventral_union_positive_loss, dorsal_side_positive_loss, ventral_side_positive_loss)]
         # x + 4.480348563949717 * y Subsets creating gaps in whole_body segment
         
         return_losses = [x + y \
@@ -350,7 +360,7 @@ def load_recent_model(saved_dir, net, epoch=None):
             index = epochs_list.index(epoch)
 
         model_file = gl[index]
-
+        print ('Loading from ', model_file)
         start_epoch = int(model_file.split("epoch")[-1].split('.')[0])
         if not torch.cuda.is_available():
             load_state = torch.load(model_file, map_location=torch.device('cpu'))

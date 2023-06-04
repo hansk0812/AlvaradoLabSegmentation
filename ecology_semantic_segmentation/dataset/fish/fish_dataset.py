@@ -205,10 +205,34 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--visualize", default="alvaradolab", help="Flag to visualize composite labels")
     args = ap.parse_args()
+
+    def return_union_sets_descending_order(ann, exclude_indices=[0], reverse=False):
+    # exclude_indices: Eliminate composite segmentation unions to prevent learning the same segment
+    # Preferred order: easiest to segment organ as ann[-1] --> hardest to segment as ann[0]
+    # GT label ordering dependent: env variable: 
+    #ORGANS needs sequence relevant ordering based on hardest-to-segment organs
+    # Based on how the regularization made me decide to do this, this code isn't a dataset based xy pair trick
+    # reverse: supersets to organs
     
+        if not reverse:
+            for idx in range(ann.shape[1]-1):
+                if idx in exclude_indices:
+                    continue
+                ann[:,idx] = torch.sum(ann[:,idx:], axis=1)
+            ann[ann>1] = 1
+        else:
+            for idx in range(ann.shape[1]-2, -1, -1):
+                if idx in exclude_indices:
+                    continue
+                ann[:,idx] = ann[:,idx]-ann[:,idx+1]
+            ann[ann>1] = 1
+            ann[ann<0] = 0
+
+        return ann
+
     organs = os.environ["ORGANS"].split(',')
 
-    dataset = FishDataset(dataset_type=["segmentation/composite"], sample_dataset=False, organs=organs, augment_flag=False) #"segmentation", 
+    dataset = FishDataset(dataset_type=["segmentation/composite"], sample_dataset=os.environ["SAMPLE"], organs=organs, augment_flag=False) #"segmentation", 
     print ("train dataset: %d images" % len(dataset))
 
     val_datasets, val_cumsum_lengths, \
@@ -218,15 +242,17 @@ if __name__ == "__main__":
     print ("val dataset: %d images" % len(valdataset))
     
     print (dataset.get_relative_ratios(ignore_superset=[0]))
-    exit()
 
     for img, seg, fname in dataset:
         img = img.transpose((1,2,0))*255 
-        
+        seg = torch.tensor(seg).unsqueeze(0)
+        seg = return_union_sets_descending_order(seg)[0].numpy()
+         
         cv2.imshow("f", img.astype(np.uint8))
         cv2.imshow("g", (seg[0]*255).astype(np.uint8))
         cv2.imshow("h", (seg[1]*255).astype(np.uint8))
         cv2.imshow("i", (seg[2]*255).astype(np.uint8))
+        cv2.imshow("j", ((seg[1]-seg[2])*255).astype(np.uint8))
         print (fname)
         cv2.waitKey()
 
