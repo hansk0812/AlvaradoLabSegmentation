@@ -338,6 +338,9 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0, early_stopp
         ventral_union_negative_loss = sum(list(losses_fn(ventral_union_g, whole_body_p * ventral_union_p)))
         ventral_side_negative_loss = sum(list(losses_fn(ventral_side_g, whole_body_p * ventral_side_p)))
         dorsal_side_negative_loss = sum(list(losses_fn(dorsal_side_g, whole_body_p * dorsal_side_p)))
+
+        # densenet-like loss introduction
+        dorsal_side_union_negative_loss = sum(list(losses_fn(dorsal_side_g, ventral_union_p * dorsal_side_p)))
         
         # set overlap as 0.5 based regularizer: possible generalization to factorized pixel map (1/k for k>2)
         # Overlap contribution set as 0.5 based on 2 classes assumption: possible generalization might involve factors based on size of segment
@@ -348,13 +351,23 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0, early_stopp
         dorsal_side_positive_loss = sum(list(losses_fn(whole_body_g, \
                                         (whole_body_p * (1 - dorsal_side_p) + (whole_body_p * dorsal_side_p + dorsal_side_p)*0.5))))
 
-        return_losses1 = [w + ventral_side_w * (y+z) + ventral_union_w * x \
-                for w,x,y,z in zip(return_losses, ventral_union_negative_loss, ventral_side_negative_loss, dorsal_side_negative_loss)] 
+        # densenet-like loss introduction
+        dorsal_side_union_positive_loss = sum(list(losses_fn(ventral_union_g, \
+                                        (ventral_union_p * (1 - dorsal_side_p) + (ventral_union_p * dorsal_side_p + dorsal_side_p)*0.5))))
+        
+        # dorsal_side vs dorsal_ventral_union loss assumed to have union weight (2 vs 4)
+        return_losses1 = [l + ventral_side_w * (x+y) + ventral_union_w * (w+z) \
+                for l,w,x,y,z in zip(return_losses, 
+                                    ventral_union_negative_loss, ventral_side_negative_loss, 
+                                    dorsal_side_negative_loss, dorsal_side_union_negative_loss)] 
         # x + 4.789727146487483 * y Subsets creating gaps in whole_body segment
 
-        # hypothesis: loss enforcing disparate segments hurts performance
-        return_losses2 = [w + dorsal_side_w * (2*y+z) + 0 * x \
-                for w,x,y,z in zip(return_losses, ventral_union_positive_loss, dorsal_side_positive_loss, ventral_side_positive_loss)]
+        # hypothesis: loss enforcing disparate segments hurts performance - looks to be true from visual inspection
+        # dorsal_side vs dorsal_ventral_union loss assumed to have union weight (2 vs 4)
+        return_losses2 = [l + dorsal_side_w * (2*y+x) + 0 * w + ventral_union_w * z \
+                for l,w,x,y,z in zip(return_losses, 
+                                        ventral_union_positive_loss, ventral_side_positive_loss, 
+                                        dorsal_side_positive_loss, dorsal_side_union_positive_loss)]
         # x + 4.480348563949717 * y Subsets creating gaps in whole_body segment
         
         return_losses = [x + y \
