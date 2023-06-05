@@ -95,8 +95,9 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
         focal_dice_w = int(epoch>2000) + int(generalized_dice_w!=1 or (epoch>2000 and epoch<2500))
         focal_dice_w = int(focal_dice_w>0)
         
-        bce_l_w = int(epoch<2000)
-        fl_l_w = int(epoch>1200 and epoch<2000)
+        # Increasing BCE and focal loss weight frequency to prevent dice loss from creating edge artifacts using the g * p numerator
+        bce_l_w = int(epoch<2000) or int(epoch % 5 == 0)
+        fl_l_w = int(epoch>1200 and epoch<2000) or int(epoch % 6 == 0)
 
         random_multiclass_weight_bool = epoch>early_stop_epoch
        
@@ -141,12 +142,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             dice_l = [dice, generalized_dice, twersky_dice, focal_dice]
             
             # focal_dice works great with DeepLabv3 but doesn't as much with resnet34 or resnet50
+            loss = focal_dice_w * focal_dice + bce_l_w * bce_l + generalized_dice_w * (generalized_dice + twersky_dice)
             
-            loss = generalized_dice # focal_dice_w * focal_dice + bce_l_w * bce_l + generalized_dice_w * generalized_dice + twersky_dice
-            # Chose generalized_dice with k for correctness' sake when focal_dice_bg was giving good variation 
-            # + k * (bg_focal_dice + bg_generalized_dice)
-            
-            # focal_dice #ce_l + fl_l + sum(dice_l)
             loss.backward()
             optimizer.step()
 
