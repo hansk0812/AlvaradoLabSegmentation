@@ -69,7 +69,7 @@ def return_union_sets_descending_order(ann, exclude_indices=[0], reverse=False):
     return ann
 
 # #TODO: Idea: Impose GT on prediction and compute loss without GT of subset for superset learning
-def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, start_epoch, num_epochs=5000, log_every=100, early_stop_epoch=400):
+def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, start_epoch, num_epochs=7000, log_every=100, early_stop_epoch=400):
     
     # Initial test for the elusive composite_set_theory flag
     composite_flag = (len(ORGANS) > 1)
@@ -80,12 +80,13 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
     # sine bg
     binary_flag = False
     for epoch_cycle in range(2*num_epochs//5, num_epochs, 100):
+        # Increasing background weight init values to account for edges removal in non-superset segment
         if binary_flag:
             # without the 0.75 factor, the parameter is too large for subsets to benefit from custom loss
-            background_weight[epoch_cycle] = 0.3 + (0.2*np.random.rand()) #0.75*(1 - np.random.rand())
+            background_weight[epoch_cycle] = 0.6 + (0.2*np.random.rand()) #0.75*(1 - np.random.rand())
         else:
             # without the 0.5 factor, the parameter is too large for subsets to benefit from custom loss
-            background_weight[epoch_cycle] = 0.7 - (0.3*np.random.rand()) #0.75*(1 + 0.5*np.random.rand())
+            background_weight[epoch_cycle] = 1 - (0.3*np.random.rand()) #0.75*(1 + 0.5*np.random.rand())
         background_keys.append(epoch_cycle)
         binary_flag = not binary_flag
     
@@ -305,7 +306,7 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0, early_stopp
 
         # direct optimization on target objective
         # superset index 1 depending on subset 2 to get set 1 
-        losses[1] += 4 * losses_fn(g[:,1:2,:,:] - g[:,2:3,:,:], x[:,1:2,:,:] - x[:,2:3,:,:])
+        losses[1] = [x + y for x, y in zip(losses_fn(g[:,1:2,:,:] - g[:,2:3,:,:], x[:,1:2,:,:] - x[:,2:3,:,:]), losses[1])]
         
         return [sum(i) for i in zip(*losses)] # /float(g.shape[CLASS_INDEX]) Using sum loss for now
     
@@ -328,9 +329,10 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0, early_stopp
         dorsal_side_g, dorsal_side_p = g[:,2:3,...], x[:,2:3,...]
         ventral_side_g, ventral_side_p = ventral_union_g - dorsal_side_g, ventral_union_p - dorsal_side_p 
         
-        ventral_union_w = 2.4376792669332903 * (1 - int(early_stopped) * np.random.choice([0,1]) * np.random.rand())
+        # re-weighting directly optimized ventral_side subset causes poor superset prediction
+        # added a factor 2 to compensate for loss in performance
+        ventral_union_w = 2 * 2.4376792669332903 * (1 - int(early_stopped) * np.random.choice([0,1]) * np.random.rand())
 
-        ventral_dorsal_side_w = 4.789727146487483 * (1 - int(early_stopped) * np.random.choice([0,1]) * np.random.rand())
         dorsal_side_w = 4.480348563949717 * (1 - int(early_stopped) * np.random.choice([0,1]) * np.random.rand())
         
         ventral_union_negative_loss = sum(list(losses_fn(ventral_union_g, whole_body_p * ventral_union_p)))
@@ -350,7 +352,8 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0, early_stopp
                 for w,x,y,z in zip(return_losses, ventral_union_negative_loss, ventral_side_negative_loss, dorsal_side_negative_loss)] 
         # x + 4.789727146487483 * y Subsets creating gaps in whole_body segment
 
-        return_losses2 = [w + dorsal_side_w * (y+z) + ventral_union_w * x \
+        # hypothesis: loss enforcing disparate segments hurts performance
+        return_losses2 = [w + dorsal_side_w * (2*y+z) + 0 * x \
                 for w,x,y,z in zip(return_losses, ventral_union_positive_loss, dorsal_side_positive_loss, ventral_side_positive_loss)]
         # x + 4.480348563949717 * y Subsets creating gaps in whole_body segment
         
