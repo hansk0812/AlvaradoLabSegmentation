@@ -127,8 +127,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
         focal_dice_w = int(focal_dice_w>0)
         
         # Increasing BCE and focal loss weight frequency to prevent dice loss from creating edge artifacts using the g * p numerator
-        bce_l_w = int(epoch<2000) or int(epoch % 5 == 0)
-        fl_l_w = int(epoch>1200 and epoch<2000) or int(epoch % 6 == 0)
+        bce_l_w = int(epoch<2000) or int(epoch % 8 == 0)
+        fl_l_w = int(epoch>1200 and epoch<2000) or int(epoch % 9 == 0)
 
         random_multiclass_weight_bool = epoch>early_stop_epoch
        
