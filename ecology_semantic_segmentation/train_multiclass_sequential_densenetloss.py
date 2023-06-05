@@ -306,7 +306,7 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0, early_stopp
         losses[1] = [x + y for x, y in zip(losses_fn(g[:,1:2,:,:] - g[:,2:3,:,:], x[:,1:2,:,:] - x[:,2:3,:,:]), losses[1])]
         
         # Adding composite weights to prevent over-prioritization on supersets during non-superset prediction
-        losses = [[l*(idx+1) for idx, l in enumerate(loss)] for loss in losses]
+        # Increasing loss weight by superset size creates small non-object artefacts in the background
         
         return [sum(i) for i in zip(*losses)] # /float(g.shape[CLASS_INDEX]) Using sum loss for now
     
