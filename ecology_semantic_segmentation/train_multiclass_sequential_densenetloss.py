@@ -52,25 +52,13 @@ def return_union_sets_descending_order(ann, exclude_indices=[0], reverse=False):
         ann[ann>1] = 1
         ann[ann<0] = 0
     
-#    if not reverse:
-#        for idx in range(ann.shape[1]-1):
-#            if idx in exclude_indices:
-#                continue
-#            ann[:,idx] = np.sum(ann[:,idx:], axis=1)
-#        ann[ann>1] = 1
-#    else:
-#        for idx in range(ann.shape[1]-2, -1, -1):
-#            if idx in exclude_indices:
-#                continue
-#            ann[:,idx] = ann[:,idx]-ann[:,idx+1]
-#        ann[ann>1] = 1
-#        ann[ann<0] = 0
-
     return ann
 
 # #TODO: Idea: Impose GT on prediction and compute loss without GT of subset for superset learning
-def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, start_epoch, num_epochs=7000, log_every=100, early_stop_epoch=400):
+def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, start_epoch, num_epochs=9000, log_every=100, early_stop_epoch=400):
     
+    #TODO: KL Divergence as loss and predictions as probability distributions
+
     # Initial test for the elusive composite_set_theory flag
     composite_flag = (len(ORGANS) > 1)
     print ("Using composite losses: ", composite_flag)
@@ -107,8 +95,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
         os.makedirs(os.path.join(save_dir, "channels%d" % MAXCHANNELS, "img%d" % IMGSIZE))
     
     # #TODO: cosine annealing needs more analysis into the epoch parameter 
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 100)
-    #scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.75, patience=50, verbose=True) 
+    #scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 100)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.75, patience=50, verbose=True) 
     
     for epoch in range(start_epoch+1, num_epochs):  # loop over the dataset multiple times
 
@@ -118,17 +106,19 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
         bg_weight = find_background_weight(epoch+1)
         
         # loss curriculum
+        # DICE score gives automatic edge detection with superset based predictions to help improve performance of whole_body beyond best multiclass model
         #TODO: loss curriculum heuristics wrt early_stop_epoch
         # loss curriculum gave minimal changes in performance when regularized losses were used!
         generalized_dice_w = int(epoch<1000) + int(epoch<2500 and epoch>1500)
         generalized_dice_w = int(generalized_dice_w>0)
 
         focal_dice_w = int(epoch>2000) + int(generalized_dice_w!=1 or (epoch>2000 and epoch<2500))
-        focal_dice_w = int(focal_dice_w>0)
+        focal_dice_w = int(focal_dice_w>0) * int(epoch%5==0) #unpredictable small object outliers if too frequent
         
-        # Increasing BCE and focal loss weight frequency to prevent dice loss from creating edge artifacts using the g * p numerator
+        # Increasing BCE weight frequency to prevent dice loss from creating edge artifacts using the g * p numerator
+        # Increasing focal loss frequency causes failure in edge detection
         bce_l_w = int(epoch<2000) or int(epoch % 8 == 0)
-        fl_l_w = int(epoch>1200 and epoch<2000) or int(epoch % 9 == 0)
+        fl_l_w = int(epoch>1200 and epoch<2000) + int(epoch%9==0)
 
         random_multiclass_weight_bool = epoch>early_stop_epoch
        
@@ -330,13 +320,15 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0, early_stopp
         ventral_side_g, ventral_side_p = ventral_union_g - dorsal_side_g, ventral_union_p - dorsal_side_p 
         
         # re-weighting directly optimized ventral_side subset causes poor superset prediction
-        # added a factor 2 to compensate for loss in performance
-        ventral_union_w = 2 * 2.4376792669332903 * (1 - int(early_stopped) * np.random.choice([0,1]) * np.random.rand())
+        # poor superset prediction generalizes to subsets in terms of decrease in performance if high lr is used along with epoch alternating focal losses
+        # added a factor 2 to compensate for loss in performance - NO EFFECT
+        ventral_union_w = 2.4376792669332903 * (1 - int(early_stopped) * np.random.choice([0,1]) * np.random.rand()) #*2
 
         dorsal_side_w = 4.480348563949717 * (1 - int(early_stopped) * np.random.choice([0,1]) * np.random.rand())
         
         ventral_union_negative_loss = sum(list(losses_fn(ventral_union_g, whole_body_p * ventral_union_p)))
         ventral_side_negative_loss = sum(list(losses_fn(ventral_side_g, whole_body_p * ventral_side_p)))
+        ventral_russel_negative_loss = sum(list(losses_fn(ventral_side_g, ventral_union_p * ventral_side_p)))
         dorsal_side_negative_loss = sum(list(losses_fn(dorsal_side_g, whole_body_p * dorsal_side_p)))
 
         # densenet-like loss introduction
@@ -348,6 +340,8 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0, early_stopp
                                         (whole_body_p * (1 - ventral_union_p) + (whole_body_p * ventral_union_p + ventral_union_p)*0.5))))
         ventral_side_positive_loss = sum(list(losses_fn(whole_body_g, \
                                         (whole_body_p * (1 - ventral_side_p) + (whole_body_p * ventral_side_p + ventral_side_p)*0.5))))
+        ventral_russel_positive_loss = sum(list(losses_fn(ventral_side_g, \
+                                        (ventral_union_p * (1 - ventral_side_p) + (ventral_union_p * ventral_side_p + ventral_side_p)*0.5))))
         dorsal_side_positive_loss = sum(list(losses_fn(whole_body_g, \
                                         (whole_body_p * (1 - dorsal_side_p) + (whole_body_p * dorsal_side_p + dorsal_side_p)*0.5))))
 
@@ -356,17 +350,17 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0, early_stopp
                                         (ventral_union_p * (1 - dorsal_side_p) + (ventral_union_p * dorsal_side_p + dorsal_side_p)*0.5))))
         
         # dorsal_side vs dorsal_ventral_union loss assumed to have union weight (2 vs 4)
-        return_losses1 = [l + ventral_side_w * (x+y) + ventral_union_w * (w+z) \
-                for l,w,x,y,z in zip(return_losses, 
-                                    ventral_union_negative_loss, ventral_side_negative_loss, 
+        return_losses1 = [l + ventral_side_w * (x+y) + ventral_union_w * (w+z) + 4*r \
+                for l,w,x,r,y,z in zip(return_losses, 
+                                    ventral_union_negative_loss, ventral_side_negative_loss, ventral_russel_negative_loss,
                                     dorsal_side_negative_loss, dorsal_side_union_negative_loss)] 
         # x + 4.789727146487483 * y Subsets creating gaps in whole_body segment
 
         # hypothesis: loss enforcing disparate segments hurts performance - looks to be true from visual inspection
         # dorsal_side vs dorsal_ventral_union loss assumed to have union weight (2 vs 4)
-        return_losses2 = [l + dorsal_side_w * (2*y+x) + 0 * w + ventral_union_w * z \
-                for l,w,x,y,z in zip(return_losses, 
-                                        ventral_union_positive_loss, ventral_side_positive_loss, 
+        return_losses2 = [l + dorsal_side_w * (2*y+x) + 0 * w + ventral_union_w * z + 4*r \
+                for l,w,x,r,y,z in zip(return_losses, 
+                                        ventral_union_positive_loss, ventral_side_positive_loss, ventral_russel_positive_loss,
                                         dorsal_side_positive_loss, dorsal_side_union_positive_loss)]
         # x + 4.480348563949717 * y Subsets creating gaps in whole_body segment
         
