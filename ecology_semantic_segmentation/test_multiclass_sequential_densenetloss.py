@@ -65,10 +65,10 @@ def test(net, dataloader, models_dir="models/vgg", results_dir="test_results/", 
             test_labels = test_labels #.cpu().numpy()
             
             # Polygon edges found on union set affecting performance!
-            for batch_idx in range(test_outputs.shape[0]):
-                for seg_idx in range(test_outputs.shape[1]):
-                    cv2.imshow(str(seg_idx), (test_outputs[batch_idx, seg_idx].cpu().numpy() * 255).astype(np.uint8))
-                cv2.waitKey()
+#            for batch_idx in range(test_outputs.shape[0]):
+#                for seg_idx in range(test_outputs.shape[1]):
+#                    cv2.imshow(str(seg_idx), (test_outputs[batch_idx, seg_idx].cpu().numpy() * 255).astype(np.uint8))
+#                cv2.waitKey()
 
             #TODO: Beam search to determine over-expression: per-model hyperparameter vs accuracy!
             # Pending
@@ -128,10 +128,11 @@ if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser()
     ap.add_argument("--single_model", type=int, help="Epoch number for model selection vs testing entire test set", default=None)
+    ap.add_argument("--batch_size", type=int, help="Test batch size", default=45)
     ap.add_argument("--models_dir", default="models/vgg", help="Flag for model selection vs testing entire test set")
     args = ap.parse_args()
     
-    batch_size = 1 if not torch.cuda.is_available() or args.single_model else 45
+    batch_size = 1 if not torch.cuda.is_available() or args.single_model else args.batch_size
 
     [x.dataset.set_augment_flag(False) for x in fish_test_dataset.datasets]
     test_dataloader = DataLoader(fish_test_dataset, shuffle=False, batch_size=batch_size, num_workers=6)
