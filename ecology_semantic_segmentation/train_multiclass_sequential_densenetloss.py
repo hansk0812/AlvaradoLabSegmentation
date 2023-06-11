@@ -49,13 +49,16 @@ def return_union_sets_descending_order(ann, exclude_indices=[0], reverse=False):
             if idx in exclude_indices:
                 continue
             ann[:,idx] = ann[:,idx]-ann[:,idx+1]
-        ann[ann>1] = 1
-        ann[ann<0] = 0
+
+            var = ann[:,idx]
+            var[var>0.9] = 1
+            var[var!=1] = 0
+            ann[:,idx] = var
     
     return ann
 
 # #TODO: Idea: Impose GT on prediction and compute loss without GT of subset for superset learning
-def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, start_epoch, num_epochs=9000, log_every=100, early_stop_epoch=400):
+def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, start_epoch, num_epochs=11000, log_every=100, early_stop_epoch=400):
     
     #TODO: KL Divergence as loss and predictions as probability distributions
 
@@ -71,10 +74,10 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
         # Increasing background weight init values to account for edges removal in non-superset segment
         if binary_flag:
             # without the 0.75 factor, the parameter is too large for subsets to benefit from custom loss
-            background_weight[epoch_cycle] = 0.6 + (0.2*np.random.rand()) #0.75*(1 - np.random.rand())
+            background_weight[epoch_cycle] = 1 + (0.2*np.random.rand()) #0.75*(1 - np.random.rand())
         else:
             # without the 0.5 factor, the parameter is too large for subsets to benefit from custom loss
-            background_weight[epoch_cycle] = 1 - (0.3*np.random.rand()) #0.75*(1 + 0.5*np.random.rand())
+            background_weight[epoch_cycle] = 2 - (0.3*np.random.rand()) #0.75*(1 + 0.5*np.random.rand())
         background_keys.append(epoch_cycle)
         binary_flag = not binary_flag
     
@@ -153,7 +156,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
 
             outputs = net(inputs)
             outputs = F.sigmoid(outputs)
-
+            
             if isinstance(outputs, tuple):
                 outputs = [outputs[0]] + outputs[1]
             
@@ -168,7 +171,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             loss.backward()
             optimizer.step()
  
-            if epoch % 10 == 0:
+            if epoch % 5 == 0:
                 torch.save(net.state_dict(), os.path.join(save_dir, "channels%d" % MAXCHANNELS, 
                             "img%d" % IMGSIZE,"%s_epoch%d.pt" % (EXPTNAME, epoch)))
            
@@ -317,7 +320,9 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0, early_stopp
         whole_body_g, whole_body_p = g[:,0:1,...], x[:,0:1,...]
         ventral_union_g, ventral_union_p = g[:,1:2,...], x[:,1:2,...]
         dorsal_side_g, dorsal_side_p = g[:,2:3,...], x[:,2:3,...]
-        ventral_side_g, ventral_side_p = ventral_union_g - dorsal_side_g, ventral_union_p - dorsal_side_p 
+        
+        #TODO: Flip the terms and check for subset-superset dependence in terms of errors
+        ventral_side_g, ventral_side_p = torch.abs(ventral_union_g - dorsal_side_g), torch.abs(ventral_union_p - dorsal_side_p) 
         
         # re-weighting directly optimized ventral_side subset causes poor superset prediction
         # poor superset prediction generalizes to subsets in terms of decrease in performance if high lr is used along with epoch alternating focal losses
