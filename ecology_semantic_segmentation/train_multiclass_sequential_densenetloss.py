@@ -165,8 +165,9 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                             background_weight=bg_weight, early_stopped=random_multiclass_weight_bool)
             dice_l = [dice, generalized_dice, twersky_dice, focal_dice]
             
+            #TODO: FOCAL LOSS IS WRONG! 
             # focal_dice works great with DeepLabv3 but doesn't as much with resnet34 or resnet50
-            loss = focal_dice_w * focal_dice + bce_l_w * bce_l + generalized_dice_w * (generalized_dice + twersky_dice)
+            loss = focal_dice_w * focal_dice + bce_l_w * bce_l #+ focal_dice_w * focal_dice + generalized_dice_w * (generalized_dice + twersky_dice)
             
             loss.backward()
             optimizer.step()
