@@ -296,7 +296,7 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0, early_stopp
 
         # direct optimization on target objective
         # superset index 1 depending on subset 2 to get set 1 
-        losses[1] = [x + y for x, y in zip(losses_fn(g[:,1:2,:,:] - g[:,2:3,:,:], x[:,1:2,:,:] - x[:,2:3,:,:]), losses[1])]
+        losses[1] = [x + y for x, y in zip(losses_fn(g[:,1:2,:,:] - g[:,2:3,:,:], torch.abs(x[:,1:2,:,:] - x[:,2:3,:,:])), losses[1])]
         
         # Adding composite weights to prevent over-prioritization on supersets during non-superset prediction
         # Increasing loss weight by superset size creates small non-object artefacts in the background
@@ -363,7 +363,7 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0, early_stopp
 
         # hypothesis: loss enforcing disparate segments hurts performance - looks to be true from visual inspection
         # dorsal_side vs dorsal_ventral_union loss assumed to have union weight (2 vs 4)
-        return_losses2 = [l + dorsal_side_w * (2*y+x) + 0 * w + ventral_union_w * z + 4*r \
+        return_losses2 = [l + dorsal_side_w * (2*y+x) + w + ventral_union_w * z + 4*r \
                 for l,w,x,r,y,z in zip(return_losses, 
                                         ventral_union_positive_loss, ventral_side_positive_loss, ventral_russel_positive_loss,
                                         dorsal_side_positive_loss, dorsal_side_union_positive_loss)]
