@@ -69,7 +69,8 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0, early_stopp
                 # NUMERICALLY REGULARIZED UNION
                 return_losses += union_loss(x[:,idx,...], 
                                             torch.abs(x[:,idx,...]-x[:,jdx,...]) * x[:,idx,...], 
-                                            g[:,idx,...]) * w_idx
+                                            g[:,idx,...]) * w_idx * w_idx * w_jdx 
+                # larger weight to highlight absence of separate class for missing subsets
     
     return return_losses
 
