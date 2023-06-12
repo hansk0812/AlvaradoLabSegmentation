@@ -74,10 +74,10 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
         # Increasing background weight init values to account for edges removal in non-superset segment
         if binary_flag:
             # without the 0.75 factor, the parameter is too large for subsets to benefit from custom loss
-            background_weight[epoch_cycle] = 1 + (0.2*np.random.rand()) #0.75*(1 - np.random.rand())
+            background_weight[epoch_cycle] = 0.3 + (0.2*np.random.rand()) #0.75*(1 - np.random.rand())
         else:
             # without the 0.5 factor, the parameter is too large for subsets to benefit from custom loss
-            background_weight[epoch_cycle] = 2 - (0.3*np.random.rand()) #0.75*(1 + 0.5*np.random.rand())
+            background_weight[epoch_cycle] = 0.7 - (0.3*np.random.rand()) #0.75*(1 + 0.5*np.random.rand())
         background_keys.append(epoch_cycle)
         binary_flag = not binary_flag
     
@@ -341,6 +341,7 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0, early_stopp
         
         # set overlap as 0.5 based regularizer: possible generalization to factorized pixel map (1/k for k>2)
         # Overlap contribution set as 0.5 based on 2 classes assumption: possible generalization might involve factors based on size of segment
+        # SUSPECTED: ventral_union weight too low for focus on subsets outside whole_body - ventral_union
         ventral_union_positive_loss = sum(list(losses_fn(whole_body_g, \
                                         (whole_body_p * (1 - ventral_union_p) + (whole_body_p * ventral_union_p + ventral_union_p)*0.5))))
         ventral_side_positive_loss = sum(list(losses_fn(whole_body_g, \
@@ -363,7 +364,7 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0, early_stopp
 
         # hypothesis: loss enforcing disparate segments hurts performance - looks to be true from visual inspection
         # dorsal_side vs dorsal_ventral_union loss assumed to have union weight (2 vs 4)
-        return_losses2 = [l + dorsal_side_w * (2*y+x) + w + ventral_union_w * z + 4*r \
+        return_losses2 = [l + dorsal_side_w * (2*y+x) + w + 4*ventral_union_w * z + 4*r \
                 for l,w,x,r,y,z in zip(return_losses, 
                                         ventral_union_positive_loss, ventral_side_positive_loss, ventral_russel_positive_loss,
                                         dorsal_side_positive_loss, dorsal_side_union_positive_loss)]
