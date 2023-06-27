@@ -8,7 +8,7 @@ def display_composite_annotations(image, labels_map, composite_labels, verbose=T
         min_positivity_ratio = 0.009, hide_whole_body_segment=False, show_composite_parts=True, return_image=False):
     
     return_images = []
-    alpha = 0.4
+    alpha = 0.75
     
     image = image.transpose((1,2,0)).astype(np.uint8)
     #cv2.imshow("image", image)
@@ -74,7 +74,7 @@ def display_composite_annotations(image, labels_map, composite_labels, verbose=T
                 cv2.imshow("fish_%s"%composite_labels[seg_id], labels_map[:,:,seg_id])
             
             seg_image = np.expand_dims(labels_map[:,:,seg_id], axis=-1).repeat(3, axis=-1) * np.array(colors[seg_id]).astype(np.uint8)
-            seg_image = cv2.addWeighted(image, 1, seg_image, 1, 1.0)
+            #seg_image = cv2.addWeighted(image, 1, seg_image, 1, 1.0)
             image = cv2.addWeighted(image, 1-alpha, seg_image, alpha, 1.0)
         
             if return_image:
