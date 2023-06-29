@@ -15,6 +15,8 @@ from .loss_functions import cross_entropy_list, binary_cross_entropy_list, focal
 
 from .loss_functions import dice_loss
 
+from .utils.subsets_union import return_union_sets_descending_order
+
 #import get_deepfish_dataset
 import random
 import numpy as np
@@ -28,34 +30,6 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 torchcpu_to_opencv = lambda img: (img.numpy().transpose((1,2,0))*255).astype(np.uint8)
-
-def return_union_sets_descending_order(ann, exclude_indices=[0], reverse=False):
-    # exclude_indices: Eliminate composite segmentation unions to prevent learning the same segment
-    # Preferred order: easiest to segment organ as ann[-1] --> hardest to segment as ann[sorted(idx) \ exclude_indices]
-    # GT label ordering dependent: env variable: 
-    #ORGANS needs sequence relevant ordering based on hardest-to-segment organs
-    # Based on how the regularization made me decide to do this, this code isn't a dataset based xy pair trick
-    # reverse: supersets to organs
-     
-    # torch polygon artefacts based on jagged edges
-    if not reverse:
-        for idx in range(ann.shape[1]-1):
-            if idx in exclude_indices:
-                continue
-            ann[:,idx] = torch.sum(ann[:,idx:], axis=1)
-        ann[ann>1] = 1
-    else:
-        for idx in range(ann.shape[1]-2, -1, -1):
-            if idx in exclude_indices:
-                continue
-            ann[:,idx] = ann[:,idx]-ann[:,idx+1]
-
-            var = ann[:,idx]
-            var[var>0.9] = 1
-            var[var!=1] = 0
-            ann[:,idx] = var
-    
-    return ann
 
 # #TODO: Idea: Impose GT on prediction and compute loss without GT of subset for superset learning
 def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, start_epoch, num_epochs=11000, log_every=100, early_stop_epoch=400):
@@ -404,6 +378,7 @@ def load_recent_model(saved_dir, net, epoch=None):
         return start_epoch
 
     except Exception:
+        print ("Model files found: ", gl)
         traceback.print_exc()
         return -1
 
@@ -432,7 +407,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--batch_size", default=7, type=int, help="Multiples of 9 give the best GPU utilization (~2023)")
     ap.add_argument("--start_epoch", default=0, type=int, help="Start training from a known model for a conceptual optimization landscape")
-    ap.add_argument("--lr", default=0.0003, type=float, help="Start training based on amount of predictions>0")
+    ap.add_argument("--lr", default=0.001, type=float, help="Start training based on amount of predictions>0")
     args = ap.parse_args()
 
    # Training script
@@ -458,7 +433,7 @@ if __name__ == "__main__":
         unet_model = unet_model.cuda()
     
     optimizer = optim.Adam(unet_model.parameters(), lr=args.lr)
-    #optimizer = optim.SGD(unet_model.parameters(), lr=0.001, momentum=0.9)
+    #optimizer = optim.SGD(unet_model.parameters(), lr=0.01, momentum=0.9)
     
     train(unet_model, train_dataloader, val_dataloader, losses_fn, optimizer, save_dir=saved_dir, start_epoch=start_epoch, 
             log_every = len(train_dataloader) // 5)
