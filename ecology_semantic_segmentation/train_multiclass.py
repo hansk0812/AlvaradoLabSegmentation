@@ -310,7 +310,7 @@ def load_recent_model(saved_dir, net, epoch=None):
         gl = glob.glob(os.path.join(saved_dir, "channels%d" % MAXCHANNELS, 
                             "img%d" % IMGSIZE, "%s*"%EXPTNAME))
         
-        epochs_list = [int(x.split("epoch")[-1].split('.')[0]) for x in gl] 
+        epochs_list = [int(x.split("epoch")[-1].split('.')[0]) for x in gl]
         latest_index = np.argmax(epochs_list)
         if epoch is None:
             index = latest_index
@@ -330,6 +330,7 @@ def load_recent_model(saved_dir, net, epoch=None):
         return start_epoch
 
     except Exception:
+        print ("Model files found: ", gl)
         traceback.print_exc()
         return -1
 
