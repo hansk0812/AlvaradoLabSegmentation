@@ -372,13 +372,18 @@ def load_recent_model(saved_dir, net, epoch=None):
             load_state = torch.load(model_file, map_location=torch.device('cpu'))
         else:    
             load_state = torch.load(model_file)
-        print ("Used latest model file: %s" % model_file)
         net.load_state_dict(load_state)
+        print ("Used latest model file: %s" % model_file)
         
         return start_epoch
 
     except Exception:
-        print ("Model files found: ", gl)
+        
+        if len(gl) > 0:
+            os.remove(gl[latest_index])
+            print ("Removed incomplete model file: ", gl[latest_index])
+            load_recent_model(saved_dir, net, epoch)
+
         traceback.print_exc()
         return -1
 
