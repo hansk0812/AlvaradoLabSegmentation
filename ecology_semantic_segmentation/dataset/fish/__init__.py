@@ -17,6 +17,7 @@ SAMPLE_DATASET = bool(get_env_variable("SAMPLE", False))
 IMGSIZE = int(get_env_variable("IMGSIZE", 256))
 MAXCHANNELS = int(get_env_variable("MAXCHANNELS", 256))
 ORGANS = [x for x in get_env_variable("ORGANS", "whole_body").split(',')]
+print ("Organs: ", ORGANS)
 
 # Deep Supervision implementation pending!
 deepsupervision = False
