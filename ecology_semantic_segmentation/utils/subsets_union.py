@@ -42,9 +42,13 @@ def detect_inner_edges(pred, gt, img=None):
 
         if not img is None:
             img = img.cpu() * 255
+            img = img.numpy().transpose((0,2,3,1)).astype(np.uint8) 
 
     for b_idx in range(pred.shape[0]):
         for idx in range(pred.shape[1]-1):
+            
+            detect_edges(img[b_idx], method="canny")
+            
             set1, set2 = pred[b_idx,idx], pred[b_idx,idx+1]
             set1_gt, set2_gt = gt[b_idx,idx], gt[b_idx,idx+1]
             
@@ -58,8 +62,7 @@ def detect_inner_edges(pred, gt, img=None):
                 set2_gt.numpy()*255).astype(np.uint8)))
 
             if not img is None:
-                cv2.imshow("img", (
-                    img[b_idx].numpy().transpose((1,2,0)).astype(np.uint8)))
+                cv2.imshow("img", img[b_idx])
 
             edge_preds = set1 * (1-set1_gt)
             edge_pixels_inside_gt = edge_preds * set2_gt
@@ -73,3 +76,36 @@ def detect_inner_edges(pred, gt, img=None):
                 edge_pixels_outside_gt.numpy()*255).astype(np.uint8)))
             cv2.waitKey()
 
+def detect_edges(img, method="sobel"):
+    
+    assert method in ["sobel", "canny"]
+
+    # sobel: [[-1,0,1],[-2,0,2],[-1,0,1]] and [[1,2,1],[0,0,0],[-1,-2,-1]]
+    # canny: blur, sobel, nms, hysteresis (thresholding with 2 thresholds 
+    # allowing yes/no inside range based on connectivity to 
+    # strong edges : > threshold)
+    
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    blur_filter_size = 3
+    img_blur = cv2.GaussianBlur(img, (blur_filter_size,blur_filter_size), sigmaX=0, sigmaY=0)
+    
+    if method == "sobel":
+
+        #sobelx = cv2.Sobel(src=img_blur, ddepth=cv2.CV_8U, dx=1, dy=0, ksize=5, 
+        #                    borderType=cv2.BORDER_ISOLATED, scale=2, delta=-1) # Sobel Edge Detection on the X axis
+        #sobely = cv2.Sobel(src=img_blur, ddepth=cv2.CV_8U, dx=0, dy=1, ksize=5, 
+        #                    borderType=cv2.BORDER_ISOLATED, scale=2, delta=-1) # Sobel Edge Detection on the Y axis
+        
+        edges = cv2.Sobel(src=img_blur, ddepth=cv2.CV_8U, dx=1, dy=1, ksize=5, 
+                            borderType=cv2.BORDER_ISOLATED, scale=2, delta=-1) # Combined X and Y Sobel Edge Detection
+    
+    else:
+        
+        # perfect fish outlines but over-expression in the background
+        #edges = cv2.Canny(image=img_blur, threshold1=200, threshold2=230, L2gradient=True, apertureSize=5) #aperture=7 works 
+        
+        # threshold1 = 10 gives more false positive edges around the backgrounds
+        edges = cv2.Canny(image=img_blur, threshold1=30, threshold2=150, apertureSize=3) 
+        
+    return edges
