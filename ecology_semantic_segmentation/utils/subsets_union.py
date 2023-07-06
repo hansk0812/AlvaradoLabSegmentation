@@ -29,14 +29,19 @@ def return_union_sets_descending_order(ann, exclude_indices=[0], reverse=False):
 
     return ann
 
-def detect_inner_edges(pred, gt):
+def detect_inner_edges(pred, gt, img=None):
     # pred: Output from semantic segmentation NN with [0] - largest superset, [-1] - only set same as gt
     # pred is processed by return_union_sets_descending_order before this function is called
     # [BATCH, CLASSES, H, W]
+    # gt.shape == pred.shape
+    # img is None unless there is visualization based need
      
     if torch.cuda.is_available():
         pred = pred.cpu()
         gt = gt.cpu()
+
+        if not img is None:
+            img = img.cpu() * 255
 
     for b_idx in range(pred.shape[0]):
         for idx in range(pred.shape[1]-1):
@@ -52,6 +57,9 @@ def detect_inner_edges(pred, gt):
             cv2.imshow("set2gt", ((
                 set2_gt.numpy()*255).astype(np.uint8)))
 
+            if not img is None:
+                cv2.imshow("img", (
+                    img[b_idx].numpy().transpose((1,2,0)).astype(np.uint8)))
 
             edge_preds = set1 * (1-set1_gt)
             edge_pixels_inside_gt = edge_preds * set2_gt
@@ -59,9 +67,9 @@ def detect_inner_edges(pred, gt):
             
             cv2.imshow("edge_preds", ((
                 edge_preds.numpy()*255).astype(np.uint8)))
-            cv2.imshow("edge_inside_gt", ((
+            cv2.imshow("edge_inside_gt_subset", ((
                 edge_pixels_inside_gt.numpy()*255).astype(np.uint8)))
-            cv2.imshow("edge_outside_gt", ((
+            cv2.imshow("edge_outside_gt_subset", ((
                 edge_pixels_outside_gt.numpy()*255).astype(np.uint8)))
             cv2.waitKey()
 

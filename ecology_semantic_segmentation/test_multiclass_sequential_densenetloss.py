@@ -11,7 +11,7 @@ from torch.nn import functional as F
 
 from torch.utils.data import DataLoader
 
-from .dataset.fish import fish_test_dataset, ORGANS
+from .dataset.fish import fish_test_dataset, ORGANS, fish_val_dataset
 from .dataset.visualize_composite_labels import display_composite_annotations
 
 from .train_multiclass import unet_model 
@@ -20,6 +20,8 @@ from .train_multiclass import load_recent_model
 from .train_multiclass_sequential_densenetloss import return_union_sets_descending_order
 
 from .loss_functions import cross_entropy_loss, dice_loss
+
+from .utils.subsets_union import return_union_sets_descending_order, detect_inner_edges
 
 def tensor_to_cv2(img_batch):
     img_batch = img_batch.numpy().transpose((0,2,3,1))
@@ -62,6 +64,8 @@ def test(net, dataloader, models_dir="models/vgg", results_dir="test_results/", 
             # idx 0: superset - whole body
             # idx -1: easiest organ to segment
             test_outputs = return_union_sets_descending_order(test_outputs, reverse=True) #.cpu().numpy()
+            detect_inner_edges(test_outputs, test_labels, img=test_images)
+            
             test_labels = test_labels #.cpu().numpy()
             
             # Polygon edges found on union set affecting performance!
@@ -106,16 +110,38 @@ def test(net, dataloader, models_dir="models/vgg", results_dir="test_results/", 
                 test_images = (test_images.numpy() * 255).astype(np.uint8)
                 test_labels = (test_labels.numpy() * 255).astype(np.uint8)
                 test_outputs = (test_outputs.numpy() * 255).astype(np.uint8)
-
-                preds = display_composite_annotations(test_images[0], test_outputs[0], ORGANS, return_image=True, verbose=False)
-                gts = display_composite_annotations(test_images[0], test_labels[0], ORGANS, return_image=True, verbose=False)
+            
+                #removing_edges, _ = cv2.findContours(test_outputs[0,1,:,:], cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
                 
-                img_keys = [list(x.keys())[0] for x in gts]
+                #area = 0
+                #for contour in removing_edges:
+                #    seg = np.zeros_like(test_outputs[0,1,:,:])
+                #    seg = cv2.fillPoly(seg, [contour], 255)
+                    
+                #    cv2.imshow('g', seg)
+                #    cv2.imshow('f', np.abs(seg - test_outputs[0,1,:,:]))
+                #    cv2.waitKey()
 
-                for idx, key in enumerate(img_keys):
+                #    overlap = np.sum(test_outputs[0,1,:,:] * seg)
+                #    if overlap > area:
+                #        area = overlap
+                #        test_outputs[0,1,:,:] = seg
 
-                    cv2.imwrite(os.path.join(dir_name, key+"_%d_gt.png" % j), gts[idx][key])
-                    cv2.imwrite(os.path.join(dir_name, key+"_%d_pred.png" % j), preds[idx][key])
+                cv2.imwrite(os.path.join(dir_name, "%d_i.png" % (j)), test_images[0].transpose(1,2,0))
+                cv2.imwrite(os.path.join(dir_name, "%d_iu.png" % (j)), test_labels[0,1] + test_labels[0,2])
+                for idx in range(test_outputs.shape[1]):
+                    cv2.imwrite(os.path.join(dir_name, "%d_%d_g.png" % (j,idx)), test_labels[0,idx,:,:])
+                    cv2.imwrite(os.path.join(dir_name, "%d_%d_p.png" % (j,idx)), test_outputs[0,idx,:,:])
+
+                #preds = display_composite_annotations(test_images[0], test_outputs[0], ORGANS, return_image=True, verbose=False)
+                #gts = display_composite_annotations(test_images[0], test_labels[0], ORGANS, return_image=True, verbose=False)
+                
+                #img_keys = [list(x.keys())[0] for x in gts]
+
+                #for idx, key in enumerate(img_keys):
+
+                #    cv2.imwrite(os.path.join(dir_name, key+"_%d_gt.png" % j), gts[idx][key])
+                #    cv2.imwrite(os.path.join(dir_name, key+"_%d_pred.png" % j), preds[idx][key])
         
         dice_loss_val = torch.tensor(test_dice[0]) / float(test_dice[1])
         print ("Epoch %d: \n\t Test Dice Score: " % saved_epoch, dice_loss_val)
@@ -131,7 +157,7 @@ if __name__ == "__main__":
     ap.add_argument("--batch_size", type=int, help="Test batch size", default=45)
     ap.add_argument("--models_dir", default="models/vgg", help="Flag for model selection vs testing entire test set")
     args = ap.parse_args()
-    
+
     batch_size = 1 if not torch.cuda.is_available() or args.single_model else args.batch_size
 
     [x.dataset.set_augment_flag(False) for x in fish_test_dataset.datasets]

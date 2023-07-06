@@ -10,10 +10,12 @@ from .dataset.fish import ORGANS, IMGSIZE, MAXCHANNELS, get_env_variable
 EXPTNAME = get_env_variable("EXPTNAME", default_value="deeplabv3p")
 
 from . import unet_model
-from .loss_functions import cross_entropy_loss, focal_loss, classification_dice_loss
-from .loss_functions import cross_entropy_list, binary_cross_entropy_list, focal_list, classification_dice_list
+#from .loss_functions import cross_entropy_loss, focal_loss, classification_dice_loss
+#from .loss_functions import cross_entropy_list, binary_cross_entropy_list, focal_list, classification_dice_list
+#
+#from .loss_functions import dice_loss
 
-from .loss_functions import dice_loss
+from .loss_composite import losses_fn
 
 from .utils.subsets_union import return_union_sets_descending_order
 
@@ -37,7 +39,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
     #TODO: KL Divergence as loss and predictions as probability distributions
 
     # Initial test for the elusive composite_set_theory flag
-    composite_flag = (len(ORGANS) > 1)
+    composite_flag = False #(len(ORGANS) > 1)
     print ("Using composite losses: ", composite_flag)
 
     background_keys = [0, int(1.6 * num_epochs//5), int(1.8 * num_epochs//5)]
@@ -135,13 +137,16 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                 outputs = [outputs[0]] + outputs[1]
             
             ce_l, bce_l, fl_l, dice, generalized_dice, twersky_dice, focal_dice = \
-                    losses_fn(outputs, labels, composite_set_theory=composite_flag, 
-                            background_weight=bg_weight, early_stopped=random_multiclass_weight_bool)
+                    losses_fn(outputs, labels, 
+                            composite_set_theory=composite_flag, 
+                            background_weight=bg_weight, 
+                            early_stopped=random_multiclass_weight_bool)
             dice_l = [dice, generalized_dice, twersky_dice, focal_dice]
             
             #TODO: FOCAL LOSS IS WRONG! 
             # focal_dice works great with DeepLabv3 but doesn't as much with resnet34 or resnet50
-            loss = focal_dice_w * focal_dice + bce_l_w * bce_l #+ focal_dice_w * focal_dice + generalized_dice_w * (generalized_dice + twersky_dice)
+            loss = bce_l #focal_dice_w * focal_dice + bce_l_w * bce_l 
+            # focal_dice_w * focal_dice + generalized_dice_w * (generalized_dice + twersky_dice)
             
             loss.backward()
             optimizer.step()
@@ -259,11 +264,13 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
 
     print('finished training')
 
+"""
 def losses_fn(x, g, composite_set_theory=False, background_weight=0, early_stopped=False):
     
     # Hardcoded subset membership loss for each composite set of organs
     # [whole_body, ventral_side, dorsal_side] = [1.         0.20878016 0.22319692] 
     # Use dataset.get_relative_ratios for every organ subset
+
 
     CLASS_INDEX = 1
     if g.shape[CLASS_INDEX] > 1:
@@ -349,6 +356,7 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0, early_stopp
                 for x,y in zip(return_losses1, return_losses2)]
 
     return return_losses
+"""
 
 def load_recent_model(saved_dir, net, epoch=None):
     # Load model from a particular epoch and train like the rest of the epochs are relevant anyway
