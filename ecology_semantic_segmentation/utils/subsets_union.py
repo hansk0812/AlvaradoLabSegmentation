@@ -47,7 +47,7 @@ def detect_inner_edges(pred, gt, img=None):
     for b_idx in range(pred.shape[0]):
         for idx in range(pred.shape[1]-1):
             
-            detect_edges(img[b_idx], method="canny")
+            edges = detect_edges(img[b_idx], method="sobel")
             
             set1, set2 = pred[b_idx,idx], pred[b_idx,idx+1]
             set1_gt, set2_gt = gt[b_idx,idx], gt[b_idx,idx+1]
@@ -68,12 +68,16 @@ def detect_inner_edges(pred, gt, img=None):
             edge_pixels_inside_gt = edge_preds * set2_gt
             edge_pixels_outside_gt = edge_preds * (1-set2_gt)
             
+            edge_preds_inner = (edge_pixels_inside_gt.numpy()*255).astype(np.uint8)
+            edge_preds_outer = (edge_pixels_outside_gt.numpy()*255).astype(np.uint8)
+            
             cv2.imshow("edge_preds", ((
                 edge_preds.numpy()*255).astype(np.uint8)))
-            cv2.imshow("edge_inside_gt_subset", ((
-                edge_pixels_inside_gt.numpy()*255).astype(np.uint8)))
-            cv2.imshow("edge_outside_gt_subset", ((
-                edge_pixels_outside_gt.numpy()*255).astype(np.uint8)))
+            cv2.imshow("edge_inside_gt_subset", edge_preds_inner)
+            cv2.imshow("edge_outside_gt_subset", edge_preds_outer)
+
+            detect_edge_pred_overlap(edges, edge_preds_inner, "inner")
+            detect_edge_pred_overlap(edges, edge_preds_outer, "outer")
             cv2.waitKey()
 
 def detect_edges(img, method="sobel"):
@@ -109,3 +113,11 @@ def detect_edges(img, method="sobel"):
         edges = cv2.Canny(image=img_blur, threshold1=30, threshold2=150, apertureSize=3) 
         
     return edges
+
+def detect_edge_pred_overlap(edges, preds, edge_type="inner"):
+
+    assert edge_type in ["inner", "outer"]
+
+    edge_overlap = edges * preds
+
+    cv2.imshow(edge_type, edge_overlap)
