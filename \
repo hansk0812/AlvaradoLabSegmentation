@@ -9,8 +9,7 @@ from .loss_functions import dice_loss
 class LossList(list):
     def __iadd__(self, other_list):
         assert len(self) == len(other_list), "Lists to be added need the same length! (%d vs %d)" % (len(self), len(other_list))
-        self = [x+y for x,y in zip(self, other_list)]
-        return LossList(self) # returning regular list because += is used only once 
+        return [x+y for x,y in zip(self, other_list)] # returning regular list because += is used only once 
     
     def __mul__(self, w):
         assert isinstance(w, float), "Multiplication supported for numerical weights only! Found %s" % type(w)
@@ -45,6 +44,8 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0, early_stopp
         # For every superset idx and corresponding subset jdx such that #classes in (idx-jdx) >= 1
         for idx in range(LENGTH-1):
             for jdx in range(idx+1, LENGTH):
+
+                print (return_losses.shape)
 
                 w_idx = (1/relative_set_ratios[idx]) * (1 - int(early_stopped) * np.random.choice([0,1]) * np.random.rand())
                 w_jdx = (1/relative_set_ratios[jdx]) * (1 - int(early_stopped) * np.random.choice([0,1]) * np.random.rand())
