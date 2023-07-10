@@ -31,7 +31,7 @@ def return_union_sets_descending_order(ann, exclude_indices=[0], reverse=False):
 
     return ann
 
-def detect_inner_edges(pred, gt, img=None):
+def detect_inner_edges(pred, gt, img=None, edge_detection_method="DoG"):
     # pred: Output from semantic segmentation NN with [0] - largest superset, [-1] - only set same as gt
     # pred is processed by return_union_sets_descending_order before this function is called
     # [BATCH, CLASSES, H, W]
@@ -49,7 +49,7 @@ def detect_inner_edges(pred, gt, img=None):
     for b_idx in range(pred.shape[0]):
         for idx in range(pred.shape[1]-1):
             
-            edges = detect_edges(img[b_idx], method="DoG")
+            edges = detect_edges(img[b_idx], method=edge_detection_method)
             
             set1, set2 = pred[b_idx,idx], pred[b_idx,idx+1]
             set1_gt, set2_gt = gt[b_idx,idx], gt[b_idx,idx+1]
@@ -78,8 +78,8 @@ def detect_inner_edges(pred, gt, img=None):
             cv2.imshow("%s_edge_inside_gt_subset" % ORGANS[idx], edge_preds_inner)
             cv2.imshow("%s_edge_outside_gt_subset" % ORGANS[idx], edge_preds_outer)
 
-            detect_edge_pred_overlap(edges, edge_preds_inner, "inner")
-            detect_edge_pred_overlap(edges, edge_preds_outer, "outer")
+            detect_edge_pred_overlap(edges, edge_preds_inner, "%s_intersect_inner" % edge_detection_method)
+            detect_edge_pred_overlap(edges, edge_preds_outer, "%s_intersect_outer" % edge_detection_method)
             cv2.waitKey()
 
 def detect_edges(img, method="sobel"):
@@ -113,9 +113,6 @@ def detect_edges(img, method="sobel"):
 
         edges = blur2 - blur1
 
-        cv2.imshow('DoG', edges)
-        cv2.waitKey()
-
     else:
         
         # perfect fish outlines but over-expression in the background
@@ -124,6 +121,8 @@ def detect_edges(img, method="sobel"):
         # threshold1 = 10 gives more false positive edges around the backgrounds
         edges = cv2.Canny(image=img_blur, threshold1=30, threshold2=150, apertureSize=3) 
         
+    cv2.imshow(method, edges)
+    
     return edges
 
 def detect_edge_pred_overlap(edges, preds, edge_type="inner"):
