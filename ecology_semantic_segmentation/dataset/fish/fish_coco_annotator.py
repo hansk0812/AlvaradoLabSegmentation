@@ -109,10 +109,22 @@ class CocoSegmentationDataset(Dataset):
         num_segments = len(composite_labels) if self.organs is None else len(self.organs)
         segment_array = np.zeros((self.img_shape, self.img_shape, num_segments)) 
         
+        organ_indices = set(range(len(self.organs)))
         for poly in polygons:
             organ, polygon = list(poly.keys())[0], list(poly.values())[0]
             
             organ_index = self.organs.index(organ)
+            
+            try:
+                organ_indices.remove(organ_index)
+            except Exception:
+                
+                assert organ_index != -1, \
+                        "Organ %s cannot be found in %s" % (organ, ','.join(self.organs))
+                
+                segment_array[:, :, organ_index] = -1
+                continue
+
             seg = segment_array[:, :, organ_index].astype(np.uint8) 
 
             cv2.fillPoly(seg, [polygon], 255) 
@@ -122,6 +134,9 @@ class CocoSegmentationDataset(Dataset):
 
             segment_array[:, :, organ_index] = seg 
         
+        for empty_index in organ_indices:
+            segment_array[:, :, empty_index] = np.ones_like(seg) * -1
+
         if self.augment_flag:
             image, segment_array = augment_fn(image, segment_array)
         
