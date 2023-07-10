@@ -3,6 +3,8 @@ import numpy as np
 
 import torch
 
+from ..dataset.fish import ORGANS
+
 def return_union_sets_descending_order(ann, exclude_indices=[0], reverse=False):
     # exclude_indices: Eliminate composite segmentation unions to prevent learning the same segment
     # Preferred order: easiest to segment organ as ann[-1] --> hardest to segment as ann[sorted(idx) \ exclude_indices]
@@ -42,12 +44,12 @@ def detect_inner_edges(pred, gt, img=None):
 
         if not img is None:
             img = img.cpu() * 255
-            img = img.numpy().transpose((0,2,3,1)).astype(np.uint8) 
+            img = img.numpy().transpose((0,2,3,1)).astype(np.uint8)
 
     for b_idx in range(pred.shape[0]):
         for idx in range(pred.shape[1]-1):
             
-            edges = detect_edges(img[b_idx], method="sobel")
+            edges = detect_edges(img[b_idx], method="DoG")
             
             set1, set2 = pred[b_idx,idx], pred[b_idx,idx+1]
             set1_gt, set2_gt = gt[b_idx,idx], gt[b_idx,idx+1]
@@ -71,10 +73,10 @@ def detect_inner_edges(pred, gt, img=None):
             edge_preds_inner = (edge_pixels_inside_gt.numpy()*255).astype(np.uint8)
             edge_preds_outer = (edge_pixels_outside_gt.numpy()*255).astype(np.uint8)
             
-            cv2.imshow("edge_preds", ((
+            cv2.imshow("%s_pred_sub_gt_edges" % ORGANS[idx], ((
                 edge_preds.numpy()*255).astype(np.uint8)))
-            cv2.imshow("edge_inside_gt_subset", edge_preds_inner)
-            cv2.imshow("edge_outside_gt_subset", edge_preds_outer)
+            cv2.imshow("%s_edge_inside_gt_subset" % ORGANS[idx], edge_preds_inner)
+            cv2.imshow("%s_edge_outside_gt_subset" % ORGANS[idx], edge_preds_outer)
 
             detect_edge_pred_overlap(edges, edge_preds_inner, "inner")
             detect_edge_pred_overlap(edges, edge_preds_outer, "outer")
@@ -82,7 +84,7 @@ def detect_inner_edges(pred, gt, img=None):
 
 def detect_edges(img, method="sobel"):
     
-    assert method in ["sobel", "canny"]
+    assert method in ["sobel", "canny", "DoG"]
 
     # sobel: [[-1,0,1],[-2,0,2],[-1,0,1]] and [[1,2,1],[0,0,0],[-1,-2,-1]]
     # canny: blur, sobel, nms, hysteresis (thresholding with 2 thresholds 
@@ -103,7 +105,17 @@ def detect_edges(img, method="sobel"):
         
         edges = cv2.Sobel(src=img_blur, ddepth=cv2.CV_8U, dx=1, dy=1, ksize=5, 
                             borderType=cv2.BORDER_ISOLATED, scale=2, delta=-1) # Combined X and Y Sobel Edge Detection
+
+    elif method == "DoG":
     
+        blur1 = cv2.GaussianBlur(img, (5,5), 2.5)
+        blur2 = cv2.GaussianBlur(img, (5,5), 2.15)
+
+        edges = blur2 - blur1
+
+        cv2.imshow('DoG', edges)
+        cv2.waitKey()
+
     else:
         
         # perfect fish outlines but over-expression in the background
@@ -117,7 +129,6 @@ def detect_edges(img, method="sobel"):
 def detect_edge_pred_overlap(edges, preds, edge_type="inner"):
 
     assert edge_type in ["inner", "outer"]
-
     edge_overlap = edges * preds
-
     cv2.imshow(edge_type, edge_overlap)
+
