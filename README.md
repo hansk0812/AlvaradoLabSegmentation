@@ -41,5 +41,12 @@ Uses Dice score for accuracy
 `python -m ecology_semantic_segmentation.test --models <MODELDIR>`
 
 ### 4-Connected lines from Photoshop annotation + 8-Connected lines from cv2 Polygon annotation = Anti-Aliased edges in CNN model result 
+Reasons:
+1. high-resolution
+2. Supersampling
+3. Intensity decisions based on object overlap
+4. Line intensity assignment differences between straight and diagonal lines
+
+https://www.geeksforgeeks.org/antialiasing/
 
 #TODO: DEEPSUPERVISION CODE!
