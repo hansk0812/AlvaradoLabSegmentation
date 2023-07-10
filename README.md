@@ -40,4 +40,6 @@ Learning Rate Scheduling for Adam: 0.0003 to start, re-define for every checkpoi
 Uses Dice score for accuracy
 `python -m ecology_semantic_segmentation.test --models <MODELDIR>`
 
+### 4-Connected lines from Photoshop annotation + 8-Connected lines from cv2 Polygon annotation = Anti-Aliased edges in CNN model result 
+
 #TODO: DEEPSUPERVISION CODE!
