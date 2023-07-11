@@ -240,6 +240,8 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
                             out = torchcpu_to_opencv(val_outputs[0][idx:idx+1])
 
                         imgpath = os.path.join("val_images", str(epoch), str(j)) 
+                        
+                        assert out.sum() > 0, "gradient descent gave no positives! aborting"
 
                         cv2.imwrite(imgpath+"_img.png", img)
                         cv2.imwrite(imgpath+"_gt_organ%d.png" % idx, gt)
@@ -450,4 +452,5 @@ if __name__ == "__main__":
     
     train(unet_model, train_dataloader, val_dataloader, losses_fn, optimizer, save_dir=saved_dir, start_epoch=start_epoch, 
             log_every = len(train_dataloader) // 5)
+
 

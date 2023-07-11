@@ -5,6 +5,7 @@ val_images/
 models*/*
 test_results/*
 *.txt
+*script.txt
 
 #Pytorch
 *.pth
