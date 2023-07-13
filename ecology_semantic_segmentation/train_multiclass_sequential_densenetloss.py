@@ -10,12 +10,12 @@ from .dataset.fish import ORGANS, IMGSIZE, MAXCHANNELS, get_env_variable
 EXPTNAME = get_env_variable("EXPTNAME", default_value="deeplabv3p")
 
 from . import unet_model
-#from .loss_functions import cross_entropy_loss, focal_loss, classification_dice_loss
-#from .loss_functions import cross_entropy_list, binary_cross_entropy_list, focal_list, classification_dice_list
+from .loss_functions import cross_entropy_loss, focal_loss, classification_dice_loss
+from .loss_functions import cross_entropy_list, binary_cross_entropy_list, focal_list, classification_dice_list
 #
-#from .loss_functions import dice_loss
+from .loss_functions import dice_loss
 
-from .loss_composite import losses_fn
+#from .loss_composite import losses_fn
 
 from .utils.subsets_union import return_union_sets_descending_order
 
@@ -32,6 +32,9 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 torchcpu_to_opencv = lambda img: (img.numpy().transpose((1,2,0))*255).astype(np.uint8)
+
+import segmentation_models_pytorch as smp
+from .model import DeepLabV3PlusDepthwise
 
 # #TODO: Idea: Impose GT on prediction and compute loss without GT of subset for superset learning
 def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, start_epoch, num_epochs=11000, log_every=100, early_stop_epoch=400):
@@ -145,8 +148,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
             
             #TODO: FOCAL LOSS IS WRONG! 
             # focal_dice works great with DeepLabv3 but doesn't as much with resnet34 or resnet50
-            loss = bce_l #focal_dice_w * focal_dice + bce_l_w * bce_l 
-            # focal_dice_w * focal_dice + generalized_dice_w * (generalized_dice + twersky_dice)
+            loss = bce_l * bce_l_w + focal_dice_w * focal_dice + generalized_dice_w * (generalized_dice + twersky_dice)
             
             loss.backward()
             optimizer.step()
@@ -266,7 +268,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
 
     print('finished training')
 
-"""
+#"""
 def losses_fn(x, g, composite_set_theory=False, background_weight=0, early_stopped=False):
     
     # Hardcoded subset membership loss for each composite set of organs
@@ -358,7 +360,7 @@ def losses_fn(x, g, composite_set_theory=False, background_weight=0, early_stopp
                 for x,y in zip(return_losses1, return_losses2)]
 
     return return_losses
-"""
+#"""
 
 def load_recent_model(saved_dir, net, epoch=None):
     # Load model from a particular epoch and train like the rest of the epochs are relevant anyway
@@ -387,17 +389,37 @@ def load_recent_model(saved_dir, net, epoch=None):
         
         return start_epoch
 
-    except Exception:
+    except Exception as e:
+         
+        if isinstance(e, RuntimeError) and isinstance(net, DeepLabV3PlusDepthwise):
+            
+            from collections import OrderedDict
+            try:
+                if not load_state is None:
+                    model_layer_dict_with_new_layers = OrderedDict()
+                    for key in load_state.keys():
+                        if "segmentation_head" in key:
+                            break
+                        model_layer_dict_with_new_layers["smp_deeplab_model."+key] = load_state[key]
+                    load_state = model_layer_dict_with_new_layers
+                    
+                    net.load_state_dict(load_state, strict=False)
+                    return start_epoch
+            except Exception:
+                traceback.print_exc()
+                pass
+
         
-        if len(gl) > 0:
-            os.remove(gl[latest_index])
-            print ("Removed incomplete model file: ", gl[latest_index])
-            load_recent_model(saved_dir, net, epoch)
+#        if len(gl) > 0:
+#            os.remove(gl[latest_index])
+#            print ("Removed incomplete model file: ", gl[latest_index])
+#            load_recent_model(saved_dir, net, epoch)
 
         traceback.print_exc()
+
         return -1
 
-import segmentation_models_pytorch as smp
+
 #unet_model = smp.Unet(
 #            encoder_name="resnet50",        # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
 #            encoder_weights="imagenet",     # use `imagenet` pre-trained weights for encoder initialization
@@ -407,7 +429,7 @@ import segmentation_models_pytorch as smp
 #        )
 
 #TODO: Layer normalization
-unet_model = smp.DeepLabV3Plus(
+unet_model = DeepLabV3PlusDepthwise( #smp.DeepLabV3Plus( 
             encoder_name="resnet34",        # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
             encoder_weights="imagenet",     # use `imagenet` pre-trained weights for encoder initialization
             in_channels=3,                  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
@@ -452,5 +474,4 @@ if __name__ == "__main__":
     
     train(unet_model, train_dataloader, val_dataloader, losses_fn, optimizer, save_dir=saved_dir, start_epoch=start_epoch, 
             log_every = len(train_dataloader) // 5)
-
 
