@@ -42,7 +42,7 @@ def train(net, traindataloader, valdataloader, losses_fn, optimizer, save_dir, s
     #TODO: KL Divergence as loss and predictions as probability distributions
 
     # Initial test for the elusive composite_set_theory flag
-    composite_flag = False #(len(ORGANS) > 1)
+    composite_flag = (len(ORGANS) > 1)
     print ("Using composite losses: ", composite_flag)
 
     background_keys = [0, int(1.6 * num_epochs//5), int(1.8 * num_epochs//5)]
