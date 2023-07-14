@@ -37,14 +37,18 @@ def detect_inner_edges(pred, gt, img=None, edge_detection_method="DoG"):
     # [BATCH, CLASSES, H, W]
     # gt.shape == pred.shape
     # img is None unless there is visualization based need
-     
+
+    # DETECTED ANTI-ALIASED EDGES 
+    
     if torch.cuda.is_available():
         pred = pred.cpu()
         gt = gt.cpu()
 
         if not img is None:
-            img = img.cpu() * 255
-            img = img.numpy().transpose((0,2,3,1)).astype(np.uint8)
+            img = img.cpu()
+
+    if not img is None:    
+        img = (img * 255).numpy().transpose((0,2,3,1)).astype(np.uint8)
 
     for b_idx in range(pred.shape[0]):
         for idx in range(pred.shape[1]-1):
@@ -75,12 +79,20 @@ def detect_inner_edges(pred, gt, img=None, edge_detection_method="DoG"):
             
             cv2.imshow("%s_pred_sub_gt_edges" % ORGANS[idx], ((
                 edge_preds.numpy()*255).astype(np.uint8)))
+            
+            cv2.imshow("%s_pred_sub_gt_edges" % ORGANS[idx+1], ((
+                (set2 * (1-set2_gt)).numpy()*255).astype(np.uint8)))
+
             cv2.imshow("%s_edge_inside_gt_subset" % ORGANS[idx], edge_preds_inner)
             cv2.imshow("%s_edge_outside_gt_subset" % ORGANS[idx], edge_preds_outer)
 
             detect_edge_pred_overlap(edges, edge_preds_inner, "%s_intersect_inner" % edge_detection_method)
             detect_edge_pred_overlap(edges, edge_preds_outer, "%s_intersect_outer" % edge_detection_method)
             cv2.waitKey()
+
+        edge_preds = pred[b_idx,-1] * (1-gt[b_idx,-1])
+        cv2.imshow(ORGANS[pred.shape[1]-1] + "_pred_sub_gt_edges", (edge_preds.numpy()*255).astype(np.uint8))
+        cv2.waitKey()
 
 def detect_edges(img, method="sobel"):
     
@@ -111,7 +123,23 @@ def detect_edges(img, method="sobel"):
         blur1 = cv2.GaussianBlur(img, (5,5), 2.5)
         blur2 = cv2.GaussianBlur(img, (5,5), 2.15)
 
-        edges = blur2 - blur1
+        edges = blur2 - blur1 # > 0).astype(np.uint8) * 255
+
+        edge_indices = np.where(edges > 0)
+        h, w = edges.shape
+        
+        for idx, jdx in zip(*edge_indices):
+            if idx > 0 and idx < h-1:
+                if jdx > 0 and jdx < w-1:
+                    #4-(dis)connectivity
+                    if edges[idx-1,jdx]==0 and edges[idx,jdx-1]==0 and \
+                            edges[idx,jdx+1]==0 and edges[idx+1,jdx+1]==0:
+
+                        #8-(dis)connectivity
+                        if edges[idx-1,jdx-1]==0 and edges[idx-1,jdx+1]==0 and \
+                                edges[idx+1,jdx+1]==0 and edges[idx+1,jdx-1]==0:
+                            
+                            edges[idx,jdx] = 0
 
     else:
         
@@ -127,7 +155,8 @@ def detect_edges(img, method="sobel"):
 
 def detect_edge_pred_overlap(edges, preds, edge_type="inner"):
 
-    assert edge_type in ["inner", "outer"]
+    assert any([x in edge_type for x in ["inner", "outer"]])
     edge_overlap = edges * preds
     cv2.imshow(edge_type, edge_overlap)
+
 
