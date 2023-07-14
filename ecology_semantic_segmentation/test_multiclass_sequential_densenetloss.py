@@ -14,8 +14,8 @@ from torch.utils.data import DataLoader
 from .dataset.fish import fish_test_dataset, ORGANS, fish_val_dataset
 from .dataset.visualize_composite_labels import display_composite_annotations
 
-from .train_multiclass import unet_model 
-from .train_multiclass import load_recent_model
+from .train_multiclass_sequential_densenetloss import unet_model 
+from .train_multiclass_sequential_densenetloss import load_recent_model
 
 from .train_multiclass_sequential_densenetloss import return_union_sets_descending_order
 
@@ -64,7 +64,9 @@ def test(net, dataloader, models_dir="models/vgg", results_dir="test_results/", 
             # idx 0: superset - whole body
             # idx -1: easiest organ to segment
             test_outputs = return_union_sets_descending_order(test_outputs, reverse=True) #.cpu().numpy()
-            detect_inner_edges(test_outputs, test_labels, img=test_images)
+            
+            if single_model:    
+                detect_inner_edges(test_outputs, test_labels, img=test_images)
             
             test_labels = test_labels #.cpu().numpy()
             
@@ -156,8 +158,11 @@ if __name__ == "__main__":
     ap.add_argument("--single_model", type=int, help="Epoch number for model selection vs testing entire test set", default=None)
     ap.add_argument("--batch_size", type=int, help="Test batch size", default=45)
     ap.add_argument("--models_dir", default="models/vgg", help="Flag for model selection vs testing entire test set")
+    ap.add_argument("--depthwiseconv", action="store_true", help="Flag to enable depthwise convolution enabling learning multiclass segments separately")
     args = ap.parse_args()
 
+    unet_model = unet_model(args.depthwiseconv) 
+    
     batch_size = 1 if not torch.cuda.is_available() or args.single_model else args.batch_size
 
     [x.dataset.set_augment_flag(False) for x in fish_test_dataset.datasets]
@@ -199,7 +204,7 @@ if __name__ == "__main__":
             else:
                 net.load_state_dict(torch.load(model_file, map_location=torch.device("cpu")))
         except Exception:
-            print ("Skipped epoch %d because of model file incompatibility!" % saved_epoch)
+            print ("Skipped epoch %d because of model file incompatibility! Did you mean to use --depthwise flag but didn't?" % saved_epoch)
             continue
 
         with torch.no_grad():

@@ -391,25 +391,28 @@ def load_recent_model(saved_dir, net, epoch=None):
 
     except Exception as e:
          
-        if isinstance(e, RuntimeError) and isinstance(net, DeepLabV3PlusDepthwise):
-            
-            from collections import OrderedDict
-            try:
-                if not load_state is None:
-                    model_layer_dict_with_new_layers = OrderedDict()
-                    for key in load_state.keys():
-                        if "segmentation_head" in key:
-                            break
-                        model_layer_dict_with_new_layers["smp_deeplab_model."+key] = load_state[key]
-                    load_state = model_layer_dict_with_new_layers
-                    
-                    net.load_state_dict(load_state, strict=False)
-                    return start_epoch
-            except Exception:
-                traceback.print_exc()
-                pass
+        if isinstance(e, RuntimeError):
+            if isinstance(net, DeepLabV3PlusDepthwise):
+                
+                from collections import OrderedDict
+                try:
+                    if not load_state is None:
+                        model_layer_dict_with_new_layers = OrderedDict()
+                        for key in load_state.keys():
+                            if "segmentation_head" in key:
+                                break
+                            model_layer_dict_with_new_layers["smp_deeplab_model."+key] = load_state[key]
+                        load_state = model_layer_dict_with_new_layers
+                        
+                        net.load_state_dict(load_state, strict=False)
+                        return start_epoch
+                except Exception:
+                    traceback.print_exc()
+                    pass
+            else:
+                print("Did you want to use the --depthwise flag instead?")
+                exit()
 
-        
 #        if len(gl) > 0:
 #            os.remove(gl[latest_index])
 #            print ("Removed incomplete model file: ", gl[latest_index])
@@ -418,7 +421,6 @@ def load_recent_model(saved_dir, net, epoch=None):
         traceback.print_exc()
 
         return -1
-
 
 #unet_model = smp.Unet(
 #            encoder_name="resnet50",        # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
@@ -429,23 +431,37 @@ def load_recent_model(saved_dir, net, epoch=None):
 #        )
 
 #TODO: Layer normalization
-unet_model = DeepLabV3PlusDepthwise( #smp.DeepLabV3Plus( 
+def unet_model(depthwise):
+
+    if depthwise: 
+        return DeepLabV3PlusDepthwise(  
             encoder_name="resnet34",        # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
             encoder_weights="imagenet",     # use `imagenet` pre-trained weights for encoder initialization
             in_channels=3,                  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
             classes=len(ORGANS),                      # model output channels (number of classes in your dataset)
             #activation="prelu"
-        )
+            )
+    else:
+        return smp.DeepLabV3Plus( 
+            encoder_name="resnet34",        # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
+            encoder_weights="imagenet",     # use `imagenet` pre-trained weights for encoder initialization
+            in_channels=3,                  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
+            classes=len(ORGANS),                      # model output channels (number of classes in your dataset)
+            #activation="prelu"
+            )
 
 if __name__ == "__main__":
     
     #TODO Discretized image sizes to closest multiple of 8
-   
+ 
     ap = argparse.ArgumentParser()
     ap.add_argument("--batch_size", default=7, type=int, help="Multiples of 9 give the best GPU utilization (~2023)")
     ap.add_argument("--start_epoch", default=0, type=int, help="Start training from a known model for a conceptual optimization landscape")
     ap.add_argument("--lr", default=0.001, type=float, help="Start training based on amount of predictions>0")
+    ap.add_argument("--depthwiseconv", action="store_true", help="Flag to enable depthwise convolution enabling learning multiclass segments separately")
     args = ap.parse_args()
+  
+    unet_model = unet_model(args.depthwiseconv) 
 
    # Training script
 
