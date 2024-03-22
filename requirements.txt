@@ -3,3 +3,5 @@ torch
 torchvision
 rawpy
 torchsummary
+segmentation_models_pytorch
+six
